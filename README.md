@@ -1,3 +1,5 @@
+<img width="1584" height="396" alt="Offer-Hub 2" src="https://github.com/user-attachments/assets/3d44b5cf-328c-4b88-ba16-44532f6644f3" />
+
 # OFFER-HUB Frontend
 
 Next.js 16 · TypeScript 5 · Tailwind CSS 4
