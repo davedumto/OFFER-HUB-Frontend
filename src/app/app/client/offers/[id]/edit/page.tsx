@@ -15,206 +15,23 @@ import {
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
-import { MOCK_CLIENT_OFFER_DETAILS } from "@/data/client-offer.data";
-
-interface Attachment {
-  id: string;
-  file: File;
-  preview?: string;
-  type: "image" | "document";
-}
-
-interface OfferFormData {
-  title: string;
-  description: string;
-  budget: string;
-  category: string;
-  deadline: string;
-}
-
-interface FormErrors {
-  title?: string;
-  description?: string;
-  budget?: string;
-  category?: string;
-  deadline?: string;
-}
-
-const CATEGORIES = [
-  { value: "", label: "Select a category" },
-  { value: "web-development", label: "Web Development" },
-  { value: "mobile-development", label: "Mobile Development" },
-  { value: "design", label: "Design & Creative" },
-  { value: "writing", label: "Writing & Translation" },
-  { value: "marketing", label: "Marketing & Sales" },
-  { value: "video", label: "Video & Animation" },
-  { value: "music", label: "Music & Audio" },
-  { value: "data", label: "Data & Analytics" },
-  { value: "other", label: "Other" },
-];
-
-const CATEGORY_LABEL_TO_VALUE: Record<string, string> = Object.fromEntries(
-  CATEGORIES.filter((cat) => cat.value !== "").map((cat) => [cat.label, cat.value])
-);
-
-const INITIAL_FORM_DATA: OfferFormData = {
-  title: "",
-  description: "",
-  budget: "",
-  category: "",
-  deadline: "",
-};
-
-const MIN_TITLE_LENGTH = 10;
-const MIN_DESCRIPTION_LENGTH = 50;
-const MIN_BUDGET = 10;
-const MOCK_API_DELAY = 1500;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_ATTACHMENTS = 5;
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-const ALLOWED_DOC_TYPES = [
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "text/plain",
-];
-
-function validateOfferForm(formData: OfferFormData): FormErrors {
-  const errors: FormErrors = {};
-
-  if (!formData.title.trim()) {
-    errors.title = "Title is required";
-  } else if (formData.title.length < MIN_TITLE_LENGTH) {
-    errors.title = `Title must be at least ${MIN_TITLE_LENGTH} characters`;
-  }
-
-  if (!formData.description.trim()) {
-    errors.description = "Description is required";
-  } else if (formData.description.length < MIN_DESCRIPTION_LENGTH) {
-    errors.description = `Description must be at least ${MIN_DESCRIPTION_LENGTH} characters`;
-  }
-
-  if (!formData.budget.trim()) {
-    errors.budget = "Budget is required";
-  } else {
-    const budgetNum = parseFloat(formData.budget);
-    if (isNaN(budgetNum) || budgetNum < MIN_BUDGET) {
-      errors.budget = `Budget must be at least $${MIN_BUDGET}`;
-    }
-  }
-
-  if (!formData.category) {
-    errors.category = "Please select a category";
-  }
-
-  if (!formData.deadline) {
-    errors.deadline = "Deadline is required";
-  } else {
-    const deadlineDate = new Date(formData.deadline);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (deadlineDate < today) {
-      errors.deadline = "Deadline must be in the future";
-    }
-  }
-
-  return errors;
-}
-
-interface FormFieldProps {
-  label: string;
-  error?: string;
-  hint?: string;
-  optional?: boolean;
-  children: React.ReactNode;
-}
-
-function FormField({
-  label,
-  error,
-  hint,
-  optional,
-  children,
-}: FormFieldProps): React.JSX.Element {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-text-primary mb-2">
-        {label}
-        {optional && <span className="text-text-secondary font-normal"> (Optional)</span>}
-      </label>
-      {children}
-      {hint && <p className="mt-1 text-xs text-text-secondary">{hint}</p>}
-      {error && <p className="mt-1 text-sm text-error">{error}</p>}
-    </div>
-  );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-interface AttachmentPreviewProps {
-  attachment: Attachment;
-  onRemove: () => void;
-}
-
-function AttachmentPreview({ attachment, onRemove }: AttachmentPreviewProps): React.JSX.Element {
-  const iconPath = attachment.type === "image" ? ICON_PATHS.image : ICON_PATHS.document;
-
-  return (
-    <div
-      className={cn(
-        "relative group rounded-xl overflow-hidden",
-        "bg-background",
-        "shadow-[2px_2px_4px_#d1d5db,-2px_-2px_4px_#ffffff]"
-      )}
-    >
-      {attachment.type === "image" && attachment.preview ? (
-        <div className="aspect-square">
-          <img
-            src={attachment.preview}
-            alt={attachment.file.name}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      ) : (
-        <div className="aspect-square flex flex-col items-center justify-center p-3">
-          <Icon path={iconPath} size="xl" className="text-primary mb-2" />
-          <p className="text-xs text-text-primary text-center truncate w-full px-1">
-            {attachment.file.name.split(".").pop()?.toUpperCase()}
-          </p>
-        </div>
-      )}
-
-      <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2">
-        <p className="text-xs text-white truncate">{attachment.file.name}</p>
-        <p className="text-xs text-white/70">{formatFileSize(attachment.file.size)}</p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onRemove}
-        className={cn(
-          "absolute top-2 right-2",
-          "w-6 h-6 rounded-full",
-          "bg-error text-white",
-          "flex items-center justify-center",
-          "opacity-0 group-hover:opacity-100",
-          "transition-opacity duration-200",
-          "cursor-pointer"
-        )}
-      >
-        <Icon path={ICON_PATHS.close} size="sm" />
-      </button>
-    </div>
-  );
-}
-
-function resolveCategoryValue(categoryLabel: string): string {
-  return CATEGORY_LABEL_TO_VALUE[categoryLabel] ?? "";
-}
+import { FormField } from "@/components/ui/FormField";
+import { AttachmentPreview } from "@/components/offers/AttachmentPreview";
+import type { Attachment, FormErrors, OfferFormData } from "@/types/client-offer.types";
+import {
+  CATEGORIES,
+  INITIAL_FORM_DATA,
+  MIN_BUDGET,
+  MIN_DESCRIPTION_LENGTH,
+  MAX_FILE_SIZE,
+  MAX_ATTACHMENTS,
+  ALLOWED_IMAGE_TYPES,
+  ALLOWED_DOC_TYPES,
+  MOCK_API_DELAY,
+  MOCK_CLIENT_OFFER_DETAILS,
+  validateOfferForm,
+  resolveCategoryValue,
+} from "@/data/client-offer.data";
 
 export default function EditOfferPage(): React.JSX.Element {
   const router = useRouter();
@@ -228,6 +45,7 @@ export default function EditOfferPage(): React.JSX.Element {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [originalDeadline, setOriginalDeadline] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -249,6 +67,17 @@ export default function EditOfferPage(): React.JSX.Element {
       category: resolveCategoryValue(offer.category),
       deadline: offer.deadline,
     });
+    setOriginalDeadline(offer.deadline);
+
+    if (offer.attachments && offer.attachments.length > 0) {
+      const preloaded: Attachment[] = offer.attachments.map((att, index) => ({
+        id: `existing-${index}-${Date.now()}`,
+        file: new File([], att.name, { type: att.type === "image" ? "image/png" : "application/pdf" }),
+        type: att.type,
+        preview: undefined,
+      }));
+      setAttachments(preloaded);
+    }
   }, [offerId]);
 
   useEffect(() => {
@@ -334,7 +163,7 @@ export default function EditOfferPage(): React.JSX.Element {
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
 
-    const validationErrors = validateOfferForm(formData);
+    const validationErrors = validateOfferForm(formData, originalDeadline);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {

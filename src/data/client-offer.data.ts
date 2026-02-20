@@ -1,4 +1,101 @@
-import type { ClientOffer, ClientOfferDetail } from "@/types/client-offer.types";
+import type {
+  ClientOffer,
+  ClientOfferDetail,
+  OfferFormData,
+  FormErrors,
+} from "@/types/client-offer.types";
+
+export const CATEGORIES = [
+  { value: "", label: "Select a category" },
+  { value: "web-development", label: "Web Development" },
+  { value: "mobile-development", label: "Mobile Development" },
+  { value: "design", label: "Design & Creative" },
+  { value: "writing", label: "Writing & Translation" },
+  { value: "marketing", label: "Marketing & Sales" },
+  { value: "video", label: "Video & Animation" },
+  { value: "music", label: "Music & Audio" },
+  { value: "data", label: "Data & Analytics" },
+  { value: "other", label: "Other" },
+];
+
+export const CATEGORY_LABEL_TO_VALUE: Record<string, string> = Object.fromEntries(
+  CATEGORIES.filter((cat) => cat.value !== "").map((cat) => [cat.label, cat.value])
+);
+
+export const INITIAL_FORM_DATA: OfferFormData = {
+  title: "",
+  description: "",
+  budget: "",
+  category: "",
+  deadline: "",
+};
+
+export const MIN_TITLE_LENGTH = 10;
+export const MIN_DESCRIPTION_LENGTH = 50;
+export const MIN_BUDGET = 10;
+export const MOCK_API_DELAY = 1500;
+export const MAX_FILE_SIZE = 10 * 1024 * 1024;
+export const MAX_ATTACHMENTS = 5;
+export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+export const ALLOWED_DOC_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
+
+export function validateOfferForm(formData: OfferFormData, originalDeadline?: string): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!formData.title.trim()) {
+    errors.title = "Title is required";
+  } else if (formData.title.length < MIN_TITLE_LENGTH) {
+    errors.title = `Title must be at least ${MIN_TITLE_LENGTH} characters`;
+  }
+
+  if (!formData.description.trim()) {
+    errors.description = "Description is required";
+  } else if (formData.description.length < MIN_DESCRIPTION_LENGTH) {
+    errors.description = `Description must be at least ${MIN_DESCRIPTION_LENGTH} characters`;
+  }
+
+  if (!formData.budget.trim()) {
+    errors.budget = "Budget is required";
+  } else {
+    const budgetNum = parseFloat(formData.budget);
+    if (isNaN(budgetNum) || budgetNum < MIN_BUDGET) {
+      errors.budget = `Budget must be at least $${MIN_BUDGET}`;
+    }
+  }
+
+  if (!formData.category) {
+    errors.category = "Please select a category";
+  }
+
+  if (!formData.deadline) {
+    errors.deadline = "Deadline is required";
+  } else {
+    const deadlineDate = new Date(formData.deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isUnchanged = originalDeadline !== undefined && formData.deadline === originalDeadline;
+    if (!isUnchanged && deadlineDate < today) {
+      errors.deadline = "Deadline must be in the future";
+    }
+  }
+
+  return errors;
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+export function resolveCategoryValue(categoryLabel: string): string {
+  return CATEGORY_LABEL_TO_VALUE[categoryLabel] ?? "";
+}
 
 export const MOCK_CLIENT_OFFERS: ClientOffer[] = [
   {
@@ -64,6 +161,10 @@ export const MOCK_CLIENT_OFFER_DETAILS: Record<string, ClientOfferDetail> = {
     deadline: "2026-02-15",
     status: "active",
     createdAt: "2026-01-05",
+    attachments: [
+      { name: "wireframes.pdf", size: 2_400_000, type: "document" },
+      { name: "homepage-mockup.png", size: 1_800_000, type: "image" },
+    ],
     applicants: [
       {
         id: "a1",
@@ -110,6 +211,7 @@ export const MOCK_CLIENT_OFFER_DETAILS: Record<string, ClientOfferDetail> = {
     deadline: "2026-01-25",
     status: "active",
     createdAt: "2026-01-03",
+    attachments: [{ name: "brand-guidelines.pdf", size: 3_200_000, type: "document" }],
     applicants: [
       {
         id: "a4",
