@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Claude
 .claude
+
+# PR description (local reference only)
+pr-description.md
