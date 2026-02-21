@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import { NEUMORPHIC_CARD, PRIMARY_BUTTON, ICON_BUTTON } from "@/lib/styles";
@@ -234,13 +234,22 @@ function ServiceActions({ service, onStatusChange, onDelete }: ServiceActionsPro
 export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Element {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const initialService = MOCK_SERVICES.find((s) => s.id === id);
   const [service, setService] = useState<Service | undefined>(initialService);
   const [ratingOrder, setRatingOrder] = useState<ServiceOrder | null>(null);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showRatingSuccessToast, setShowRatingSuccessToast] = useState(false);
+  const [showUpdateSuccessToast, setShowUpdateSuccessToast] = useState(false);
   const [, forceUpdate] = useState(0);
   const orders = getOrdersByServiceId(id);
+
+  useEffect(() => {
+    if (searchParams.get("updated") === "true") {
+      setShowUpdateSuccessToast(true);
+      router.replace(`/app/freelancer/services/${id}`);
+    }
+  }, [id, router, searchParams]);
 
   function handleStatusChange(newStatus: ServiceStatus): void {
     if (service) {
@@ -260,13 +269,13 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
 
   function handleRatingSuccess(): void {
     setRatingOrder(null);
-    setShowSuccessToast(true);
+    setShowRatingSuccessToast(true);
     forceUpdate((n) => n + 1);
   }
 
   if (!service) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <div className={cn(NEUMORPHIC_CARD, "text-center max-w-md")}>
           <div
             className={cn(
@@ -311,7 +320,7 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
             </h1>
             <span
               className={cn(
-                "px-3 py-1 rounded-lg text-sm font-medium flex-shrink-0",
+                "px-3 py-1 rounded-lg text-sm font-medium shrink-0",
                 STATUS_STYLES[service.status]
               )}
             >
@@ -459,11 +468,19 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
         />
       )}
 
-      {showSuccessToast && (
+      {showRatingSuccessToast && (
         <Toast
           message="Rating submitted successfully!"
           type="success"
-          onClose={() => setShowSuccessToast(false)}
+          onClose={() => setShowRatingSuccessToast(false)}
+        />
+      )}
+
+      {showUpdateSuccessToast && (
+        <Toast
+          message="Service updated successfully!"
+          type="success"
+          onClose={() => setShowUpdateSuccessToast(false)}
         />
       )}
     </div>
