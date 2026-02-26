@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/cn";
+import { MOCK_API_DELAY } from "@/lib/constants";
 import { useAuthStore } from "@/stores/auth-store";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import {
@@ -75,7 +76,6 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[+]?[\d\s-()]+$/;
 const MIN_USERNAME_LENGTH = 3;
 const MAX_BIO_LENGTH = 500;
-const MOCK_API_DELAY = 1500;
 const SUCCESS_MESSAGE_DURATION = 3000;
 
 const INITIAL_FORM_DATA: ProfileFormData = {

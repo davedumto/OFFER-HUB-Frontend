@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { MOCK_API_DELAY } from "@/lib/constants";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ImageUpload } from "@/components/ui/ImageUpload";
@@ -26,7 +27,6 @@ import type {
   PortfolioFormErrors,
 } from "@/types/portfolio.types";
 
-const MOCK_API_DELAY = 1000;
 const SUCCESS_MESSAGE_DURATION = 3000;
 
 const SECONDARY_BUTTON_STYLES = cn(

@@ -4,6 +4,7 @@ import type {
   OfferFormData,
   FormErrors,
 } from "@/types/client-offer.types";
+import { MOCK_API_DELAY } from "@/lib/constants";
 
 export const CATEGORIES = [
   { value: "", label: "Select a category" },
@@ -33,7 +34,7 @@ export const INITIAL_FORM_DATA: OfferFormData = {
 export const MIN_TITLE_LENGTH = 10;
 export const MIN_DESCRIPTION_LENGTH = 50;
 export const MIN_BUDGET = 10;
-export const MOCK_API_DELAY = 1500;
+export { MOCK_API_DELAY };
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 export const MAX_ATTACHMENTS = 5;
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];

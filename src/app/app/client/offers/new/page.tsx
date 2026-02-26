@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { MOCK_API_DELAY } from "@/lib/constants";
 import { useModeStore } from "@/stores/mode-store";
 import {
   NEUMORPHIC_CARD,
@@ -26,7 +27,6 @@ import {
   MAX_ATTACHMENTS,
   ALLOWED_IMAGE_TYPES,
   ALLOWED_DOC_TYPES,
-  MOCK_API_DELAY,
   validateOfferForm,
 } from "@/data/client-offer.data";
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/stores/auth-store";
 import { useModeStore } from "@/stores/mode-store";
 import { cn } from "@/lib/cn";
+import { MOCK_API_DELAY } from "@/lib/constants";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import {
   NEUMORPHIC_CARD,
@@ -25,7 +26,6 @@ import type {
 } from "@/types/freelancer-profile.types";
 
 const MAX_BIO_LENGTH = 500;
-const MOCK_API_DELAY = 1500;
 const SUCCESS_MESSAGE_DURATION = 3000;
 
 const SECONDARY_BUTTON_STYLES = cn(

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { MOCK_API_DELAY } from "@/lib/constants";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import {
   NEUMORPHIC_CARD,
@@ -22,8 +23,6 @@ import {
   MAX_DELIVERY_DAYS,
 } from "@/data/service.data";
 import type { ServiceFormData, ServiceFormErrors } from "@/types/service.types";
-
-const MOCK_API_DELAY = 1500;
 
 const INITIAL_FORM_DATA: ServiceFormData = {
   title: "",
