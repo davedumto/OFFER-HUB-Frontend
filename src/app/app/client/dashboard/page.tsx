@@ -12,6 +12,7 @@ import {
   ICON_CONTAINER,
 } from "@/lib/styles";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
+import { CLIENT_ACTIVITY, CLIENT_ACTIVITY_ICONS } from "@/data/client-dashboard.data";
 
 interface StatCard {
   label: string;
@@ -151,7 +152,7 @@ function ActivityItemComponent({
   return (
     <div className={cn("flex items-start gap-4 p-4 rounded-xl", NEUMORPHIC_INSET)}>
       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <Icon path={ACTIVITY_ICONS[activity.type]} size="md" className="text-primary" />
+        <Icon path={CLIENT_ACTIVITY_ICONS[activity.type] || ICON_PATHS.infoCircle} size="md" className="text-primary" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-medium text-text-primary">{activity.title}</p>
@@ -209,13 +210,16 @@ export default function ClientDashboardPage(): React.JSX.Element {
       <div className={NEUMORPHIC_CARD}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-text-primary">Recent Activity</h2>
-          <button className="text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer">
+          <Link
+            href="/app/client/activities"
+            className="text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer"
+          >
             View all
-          </button>
+          </Link>
         </div>
 
         <div className="space-y-4">
-          {MOCK_ACTIVITY.map((activity) => (
+          {CLIENT_ACTIVITY.slice(0, 5).map((activity) => (
             <ActivityItemComponent key={activity.id} activity={activity} />
           ))}
         </div>

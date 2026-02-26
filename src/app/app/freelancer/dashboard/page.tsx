@@ -135,13 +135,16 @@ export default function FreelancerDashboardPage(): React.JSX.Element {
       <div className={NEUMORPHIC_CARD}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-text-primary">Recent Activity</h2>
-          <button className="text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer">
+          <Link
+            href="/app/freelancer/activities"
+            className="text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer"
+          >
             View all
-          </button>
+          </Link>
         </div>
 
         <div className="space-y-4">
-          {FREELANCER_ACTIVITY.map((activity) => (
+          {FREELANCER_ACTIVITY.slice(0, 5).map((activity) => (
             <ActivityItem key={activity.id} activity={activity} />
           ))}
         </div>
