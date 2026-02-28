@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { NEUMORPHIC_CARD, NEUMORPHIC_INSET, ICON_BUTTON, PRIMARY_BUTTON } from "@/lib/styles";
 import { MOCK_CLIENT_OFFERS } from "@/data/client-offer.data";
 import type { ClientOffer, FilterStatus } from "@/types/client-offer.types";
+import { Toast } from "@/components/ui/Toast";
 
 const FILTER_STATUSES: FilterStatus[] = ["all", "active", "pending", "closed"];
 
@@ -99,7 +100,11 @@ export default function ManageOffersPage(): React.JSX.Element {
     setIsConfirming(true);
     await new Promise((r) => setTimeout(r, 250));
     setOffers((prev) => prev.filter((o) => o.id !== deleteTarget));
+    // Add toast here — adjust to your Toast API:
+    Toast({ message: "Offer deleted successfully.", type: "success", onClose: () => {} });
+
     setIsConfirming(false);
+
     setDeleteTarget(null);
     setDeleteModalOpen(false);
   }
@@ -157,9 +162,9 @@ export default function ManageOffersPage(): React.JSX.Element {
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Delete Offer?"
-        message="Are you sure you want to delete this offer?"
-        confirmText="Delete"
-        cancelText="Cancel"
+        message={`Are you sure you want to delete "${offers.find((o) => o.id === deleteTarget)?.title ?? "this offer"}"? All applicants will be notified.`}
+        confirmText="Delete Offer"
+        cancelText="Keep Offer"
         variant="danger"
         icon={ICON_PATHS.trash}
         isLoading={isConfirming}
@@ -167,3 +172,5 @@ export default function ManageOffersPage(): React.JSX.Element {
     </div>
   );
 }
+
+
