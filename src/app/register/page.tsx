@@ -11,10 +11,14 @@ import {
   PasswordRequirements,
 } from "@/components/auth";
 import { cn } from "@/lib/cn";
+import { useAuthStore } from "@/stores/auth-store";
+import { useModeStore } from "@/stores/mode-store";
 import type { RegisterFormData, AuthFormErrors } from "@/types/auth.types";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const login = useAuthStore((state) => state.login);
+  const mode = useModeStore((state) => state.mode);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -72,16 +76,69 @@ export default function RegisterPage() {
 
     setIsLoading(true);
 
-    // Mock registration - simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          type: "BOTH",
+        }),
+      });
 
-    setIsLoading(false);
-    setIsSuccess(true);
+      const data = await response.json();
 
-    // Redirect to login after success animation
-    setTimeout(() => {
-      router.push("/login?registered=true");
-    }, 1500);
+      if (!response.ok) {
+        setErrors({ email: data.error || "Registration failed" });
+        setIsLoading(false);
+        return;
+      }
+
+      setIsSuccess(true);
+
+      // Auto-login after successful registration to get full user data (including wallet)
+      try {
+        const loginResponse = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
+        });
+
+        if (loginResponse.ok) {
+          const loginData = await loginResponse.json();
+          login(loginData.user, loginData.token);
+
+          // Wait for Zustand persist to write cookie before redirecting
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        } else {
+          console.error("Auto-login failed:", await loginResponse.text());
+        }
+      } catch (loginError) {
+        console.error("Auto-login error:", loginError);
+      }
+
+      setIsLoading(false);
+
+      // Redirect to the appropriate dashboard based on mode
+      const defaultDashboard = mode === "freelancer"
+        ? "/app/freelancer/dashboard"
+        : mode === "client"
+        ? "/app/client/dashboard"
+        : "/app/dashboard";
+
+      // Redirect to dashboard after success animation
+      setTimeout(() => {
+        window.location.href = defaultDashboard;
+      }, 1500);
+    } catch (error) {
+      console.error("Register error:", error);
+      setErrors({ email: "Connection error. Please try again." });
+      setIsLoading(false);
+    }
   };
 
   if (isSuccess) {
@@ -114,7 +171,7 @@ export default function RegisterPage() {
             Account Created!
           </h2>
           <p className="text-sm text-text-secondary mt-2 text-center opacity-0 animate-fade-in-up" style={{ animationDelay: "0.5s", animationFillMode: "forwards" }}>
-            Redirecting you to sign in...
+            Redirecting you to dashboard...
           </p>
 
           {/* Loading dots */}

@@ -1,22 +1,23 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import { NEUMORPHIC_CARD, PRIMARY_BUTTON, ICON_BUTTON } from "@/lib/styles";
 import {
-  MOCK_SERVICES,
   SERVICE_CATEGORIES,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
-  getOrdersByServiceId,
 } from "@/data/service.data";
 import { getChatIdByOrderId } from "@/data/chat.data";
 import { hasClientRating } from "@/data/rating.data";
 import { RateClientModal } from "@/components/rating";
 import { Toast } from "@/components/ui/Toast";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { getServiceById, updateServiceStatus, deleteService, getServiceOrders } from "@/lib/api/services";
+import { useAuthStore } from "@/stores/auth-store";
 import type { Service, ServiceOrder, ServiceStatus } from "@/types/service.types";
 
 interface PageProps {
@@ -24,15 +25,15 @@ interface PageProps {
 }
 
 const STATUS_STYLES: Record<ServiceStatus, string> = {
-  active: "bg-success/20 text-success",
-  paused: "bg-warning/20 text-warning",
-  archived: "bg-text-secondary/20 text-text-secondary",
+  ACTIVE: "bg-success/20 text-success",
+  PAUSED: "bg-warning/20 text-warning",
+  ARCHIVED: "bg-text-secondary/20 text-text-secondary",
 };
 
 const STATUS_LABELS: Record<ServiceStatus, string> = {
-  active: "Active",
-  paused: "Paused",
-  archived: "Archived",
+  ACTIVE: "Active",
+  PAUSED: "Paused",
+  ARCHIVED: "Archived",
 };
 
 function getCategoryLabel(value: string): string {
@@ -69,18 +70,14 @@ function OrderCard({ order, onRateClient }: OrderCardProps): React.JSX.Element {
         </div>
         <div>
           <p className="font-medium text-text-primary">{order.clientName}</p>
-          <p className="text-sm text-text-secondary">
-            Ordered {formatDate(order.orderedAt)}
-          </p>
+          <p className="text-sm text-text-secondary">Ordered {formatDate(order.orderedAt)}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
         <div className="text-right hidden sm:block">
           <p className="font-semibold text-text-primary">${order.price}</p>
-          <p className="text-xs text-text-secondary">
-            Due {formatDate(order.deliveryDate)}
-          </p>
+          <p className="text-xs text-text-secondary">Due {formatDate(order.deliveryDate)}</p>
         </div>
 
         <span
@@ -93,15 +90,9 @@ function OrderCard({ order, onRateClient }: OrderCardProps): React.JSX.Element {
         </span>
 
         <div className="flex items-center gap-1">
-          {isCompleted && (
-            alreadyRated ? (
-              <span
-                className={cn(
-                  "p-2 rounded-lg",
-                  "text-success"
-                )}
-                title="Client rated"
-              >
+          {isCompleted &&
+            (alreadyRated ? (
+              <span className={cn("p-2 rounded-lg", "text-success")} title="Client rated">
                 <Icon path={ICON_PATHS.star} size="sm" />
               </span>
             ) : (
@@ -117,8 +108,7 @@ function OrderCard({ order, onRateClient }: OrderCardProps): React.JSX.Element {
               >
                 <Icon path={ICON_PATHS.star} size="sm" />
               </button>
-            )
-          )}
+            ))}
 
           <Link
             href={`/app/chat/${getChatIdByOrderId(order.id)}`}
@@ -169,7 +159,11 @@ interface ServiceActionsProps {
   onDelete: () => void;
 }
 
-function ServiceActions({ service, onStatusChange, onDelete }: ServiceActionsProps): React.JSX.Element {
+function ServiceActions({
+  service,
+  onStatusChange,
+  onDelete,
+}: ServiceActionsProps): React.JSX.Element {
   return (
     <div className={NEUMORPHIC_CARD}>
       <h2 className="text-lg font-semibold text-text-primary mb-4">Actions</h2>
@@ -186,10 +180,10 @@ function ServiceActions({ service, onStatusChange, onDelete }: ServiceActionsPro
           <span className="font-medium">Edit Service</span>
         </Link>
 
-        {service.status === "active" ? (
+        {service.status === "ACTIVE" ? (
           <button
             type="button"
-            onClick={() => onStatusChange("paused")}
+            onClick={() => onStatusChange("PAUSED")}
             className={cn(
               "flex items-center gap-3 w-full px-4 py-3 rounded-xl",
               "bg-warning/10 text-warning",
@@ -202,7 +196,7 @@ function ServiceActions({ service, onStatusChange, onDelete }: ServiceActionsPro
         ) : (
           <button
             type="button"
-            onClick={() => onStatusChange("active")}
+            onClick={() => onStatusChange("ACTIVE")}
             className={cn(
               "flex items-center gap-3 w-full px-4 py-3 rounded-xl",
               "bg-success/10 text-success",
@@ -234,23 +228,108 @@ function ServiceActions({ service, onStatusChange, onDelete }: ServiceActionsPro
 export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Element {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = useAuthStore((state) => state.token);
 
-  const initialService = MOCK_SERVICES.find((s) => s.id === id);
-  const [service, setService] = useState<Service | undefined>(initialService);
+  const [mounted, setMounted] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [service, setService] = useState<Service | null>(null);
+  const [isFetchingService, setIsFetchingService] = useState(true);
   const [ratingOrder, setRatingOrder] = useState<ServiceOrder | null>(null);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showRatingSuccessToast, setShowRatingSuccessToast] = useState(false);
+  const [showUpdateSuccessToast, setShowUpdateSuccessToast] = useState(
+    () => searchParams.get("updated") === "true"
+  );
   const [, forceUpdate] = useState(0);
-  const orders = getOrdersByServiceId(id);
+  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isFetchingOrders, setIsFetchingOrders] = useState(true);
 
-  function handleStatusChange(newStatus: ServiceStatus): void {
-    if (service) {
-      setService({ ...service, status: newStatus });
+  useEffect(() => {
+    useAuthStore.persist.rehydrate();
+
+    setTimeout(() => {
+      setHydrated(true);
+      setMounted(true);
+    }, 100);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !hydrated) return;
+
+    if (token) {
+      getServiceById(token, id)
+        .then((data) => {
+          setService(data);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch service:', error);
+        })
+        .finally(() => {
+          setIsFetchingService(false);
+        });
+    } else {
+      setIsFetchingService(false);
+    }
+  }, [mounted, hydrated, token, id]);
+
+  useEffect(() => {
+    if (!mounted || !hydrated) return;
+
+    if (token) {
+      getServiceOrders(token, id)
+        .then((data) => {
+          setOrders(data);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch orders:', error);
+          setOrders([]);
+        })
+        .finally(() => {
+          setIsFetchingOrders(false);
+        });
+    } else {
+      setIsFetchingOrders(false);
+    }
+  }, [mounted, hydrated, token, id]);
+
+  useEffect(() => {
+    if (searchParams.get("updated") === "true") {
+      router.replace(`/app/freelancer/services/${id}`);
+    }
+  }, [id, router, searchParams]);
+
+  async function handleStatusChange(newStatus: ServiceStatus): Promise<void> {
+    if (!service || !token) return;
+
+    try {
+      const updatedService = await updateServiceStatus(token, id, { status: newStatus });
+      setService(updatedService);
+    } catch (error) {
+      console.error('Failed to update service status:', error);
     }
   }
 
   function handleDelete(): void {
-    if (confirm("Are you sure you want to delete this service? This action cannot be undone.")) {
-      router.push("/app/freelancer/services");
+    if (!service) return;
+    setDeleteModalOpen(true);
+  }
+
+  async function handleConfirmDelete(): Promise<void> {
+    if (!service || !token) return;
+
+    const deletedServiceName = service.title;
+    setIsDeleting(true);
+
+    try {
+      await deleteService(token, id);
+      router.push(`/app/freelancer/services?deleted=${encodeURIComponent(deletedServiceName)}`);
+    } catch (error) {
+      console.error('Failed to delete service:', error);
+    } finally {
+      setIsDeleting(false);
+      setDeleteModalOpen(false);
     }
   }
 
@@ -260,13 +339,43 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
 
   function handleRatingSuccess(): void {
     setRatingOrder(null);
-    setShowSuccessToast(true);
+    setShowRatingSuccessToast(true);
     forceUpdate((n) => n + 1);
   }
 
+  // Show loading state while fetching service
+  if (isFetchingService) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="flex-1">
+            <div className="h-8 bg-gray-200 rounded w-64 mb-2 animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded w-96 animate-pulse" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2 space-y-4">
+            <div className={cn(NEUMORPHIC_CARD, "p-6 space-y-4 animate-pulse")}>
+              <div className="h-6 bg-gray-200 rounded w-48" />
+              <div className="h-20 bg-gray-200 rounded" />
+              <div className="grid grid-cols-4 gap-4">
+                <div className="h-16 bg-gray-200 rounded" />
+                <div className="h-16 bg-gray-200 rounded" />
+                <div className="h-16 bg-gray-200 rounded" />
+                <div className="h-16 bg-gray-200 rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show not found if service doesn't exist after loading
   if (!service) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <div className={cn(NEUMORPHIC_CARD, "text-center max-w-md")}>
           <div
             className={cn(
@@ -277,9 +386,7 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
           >
             <Icon path={ICON_PATHS.briefcase} size="xl" className="text-text-secondary" />
           </div>
-          <h2 className="text-xl font-bold text-text-primary mb-2">
-            Service not found
-          </h2>
+          <h2 className="text-xl font-bold text-text-primary mb-2">Service not found</h2>
           <p className="text-text-secondary mb-4">
             The service you are looking for does not exist or has been removed.
           </p>
@@ -291,12 +398,22 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
             Back to Services
           </button>
         </div>
+
       </div>
     );
   }
 
-  const activeOrders = orders.filter((o) => o.status === "in_progress" || o.status === "pending");
-  const completedOrders = orders.filter((o) => o.status === "completed" || o.status === "delivered");
+  const activeOrders = orders.filter((o) =>
+    o.status === "IN_PROGRESS" ||
+    o.status === "ORDER_CREATED" ||
+    o.status === "FUNDS_RESERVED" ||
+    o.status === "ESCROW_CREATING" ||
+    o.status === "ESCROW_FUNDING" ||
+    o.status === "ESCROW_FUNDED"
+  );
+  const completedOrders = orders.filter(
+    (o) => o.status === "RELEASED" || o.status === "CLOSED"
+  );
 
   return (
     <div className="space-y-4">
@@ -306,12 +423,10 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-text-primary truncate">
-              {service.title}
-            </h1>
+            <h1 className="text-2xl font-bold text-text-primary truncate">{service.title}</h1>
             <span
               className={cn(
-                "px-3 py-1 rounded-lg text-sm font-medium flex-shrink-0",
+                "px-3 py-1 rounded-lg text-sm font-medium shrink-0",
                 STATUS_STYLES[service.status]
               )}
             >
@@ -327,9 +442,7 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 space-y-4">
           <div className={NEUMORPHIC_CARD}>
-            <h2 className="text-lg font-semibold text-text-primary mb-4">
-              Service Details
-            </h2>
+            <h2 className="text-lg font-semibold text-text-primary mb-4">Service Details</h2>
             <div className="space-y-4">
               <div>
                 <p className="text-text-secondary text-sm mb-1">Description</p>
@@ -339,7 +452,7 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border-light">
                 <div>
                   <p className="text-text-secondary text-sm mb-1">Price</p>
-                  <p className="text-xl font-bold text-primary">${service.price}</p>
+                  <p className="text-xl font-bold text-primary">${parseFloat(service.price).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-text-secondary text-sm mb-1">Delivery</p>
@@ -349,13 +462,13 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
                 </div>
                 <div>
                   <p className="text-text-secondary text-sm mb-1">Total Orders</p>
-                  <p className="text-xl font-bold text-text-primary">{service.orders}</p>
+                  <p className="text-xl font-bold text-text-primary">{service.totalOrders}</p>
                 </div>
                 <div>
                   <p className="text-text-secondary text-sm mb-1">Rating</p>
                   <p className="text-xl font-bold text-text-primary flex items-center gap-1">
                     <Icon path={ICON_PATHS.star} size="sm" className="text-warning" />
-                    {service.rating}
+                    {service.averageRating ? parseFloat(service.averageRating).toFixed(1) : "N/A"}
                   </p>
                 </div>
               </div>
@@ -369,11 +482,7 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
               </h2>
               <div className="space-y-3">
                 {activeOrders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onRateClient={handleRateClient}
-                  />
+                  <OrderCard key={order.id} order={order} onRateClient={handleRateClient} />
                 ))}
               </div>
             </div>
@@ -386,11 +495,7 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
               </h2>
               <div className="space-y-3">
                 {completedOrders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onRateClient={handleRateClient}
-                  />
+                  <OrderCard key={order.id} order={order} onRateClient={handleRateClient} />
                 ))}
               </div>
             </div>
@@ -398,14 +503,8 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
 
           {orders.length === 0 && (
             <div className={cn(NEUMORPHIC_CARD, "text-center py-8")}>
-              <Icon
-                path={ICON_PATHS.users}
-                size="xl"
-                className="text-gray-300 mx-auto mb-3"
-              />
-              <h3 className="text-lg font-medium text-text-primary mb-1">
-                No orders yet
-              </h3>
+              <Icon path={ICON_PATHS.users} size="xl" className="text-gray-300 mx-auto mb-3" />
+              <h3 className="text-lg font-medium text-text-primary mb-1">No orders yet</h3>
               <p className="text-text-secondary text-sm">
                 Orders from clients will appear here once they start coming in.
               </p>
@@ -421,21 +520,17 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
           />
 
           <div className={NEUMORPHIC_CARD}>
-            <h2 className="text-lg font-semibold text-text-primary mb-4">
-              Statistics
-            </h2>
+            <h2 className="text-lg font-semibold text-text-primary mb-4">Statistics</h2>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-text-secondary">Total Earnings</span>
+                <span className="text-text-secondary">Service Revenue</span>
                 <span className="font-semibold text-text-primary">
-                  ${service.orders * service.price}
+                  ${(service.totalOrders * parseFloat(service.price)).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-text-secondary">Active Orders</span>
-                <span className="font-semibold text-text-primary">
-                  {activeOrders.length}
-                </span>
+                <span className="font-semibold text-text-primary">{activeOrders.length}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-text-secondary">Completion Rate</span>
@@ -459,13 +554,33 @@ export default function ServiceDetailsPage({ params }: PageProps): React.JSX.Ele
         />
       )}
 
-      {showSuccessToast && (
+      {showRatingSuccessToast && (
         <Toast
           message="Rating submitted successfully!"
           type="success"
-          onClose={() => setShowSuccessToast(false)}
+          onClose={() => setShowRatingSuccessToast(false)}
         />
       )}
+
+      {showUpdateSuccessToast && (
+        <Toast
+          message="Service updated successfully!"
+          type="success"
+          onClose={() => setShowUpdateSuccessToast(false)}
+        />
+      )}
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Service?"
+        message={`Are you sure you want to delete "${service.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        icon={ICON_PATHS.trash}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

@@ -4,6 +4,36 @@
 
 export type OfferStatus = "active" | "pending" | "closed" | "completed";
 
+export interface Attachment {
+  id: string;
+  file: File;
+  preview?: string;
+  type: "image" | "document";
+  displaySize?: number;
+}
+
+export interface OfferAttachmentData {
+  name: string;
+  size: number;
+  type: "image" | "document";
+}
+
+export interface OfferFormData {
+  title: string;
+  description: string;
+  budget: string;
+  category: string;
+  deadline: string;
+}
+
+export interface FormErrors {
+  title?: string;
+  description?: string;
+  budget?: string;
+  category?: string;
+  deadline?: string;
+}
+
 export interface Applicant {
   id: string;
   name: string;
@@ -30,6 +60,7 @@ export interface ClientOfferDetail extends Omit<ClientOffer, "applicants"> {
   description: string;
   applicants: Applicant[];
   hiredFreelancer?: Applicant;
+  attachments?: OfferAttachmentData[];
 }
 
 export type FilterStatus = OfferStatus | "all";

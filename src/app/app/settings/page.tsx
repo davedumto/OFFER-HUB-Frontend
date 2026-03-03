@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { MOCK_API_DELAY } from "@/lib/constants";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import { NEUMORPHIC_CARD, PRIMARY_BUTTON } from "@/lib/styles";
 
@@ -77,7 +78,6 @@ function ToggleSwitch({ enabled, onChange, label, description }: ToggleSwitchPro
   );
 }
 
-const MOCK_API_DELAY = 1000;
 const SUCCESS_MESSAGE_DURATION = 3000;
 
 export default function SettingsPage(): React.JSX.Element {

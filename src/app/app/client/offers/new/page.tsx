@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { useModeStore } from "@/stores/mode-store";
+import { useAuthStore } from "@/stores/auth-store";
 import {
   NEUMORPHIC_CARD,
   NEUMORPHIC_INPUT,
@@ -13,203 +14,42 @@ import {
   PRIMARY_BUTTON,
 } from "@/lib/styles";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
+import { FormField } from "@/components/ui/FormField";
+import { AttachmentPreview } from "@/components/offers/AttachmentPreview";
+import { ImageUpload } from "@/components/ui/ImageUpload";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { createOffer, uploadAttachment, type OfferCategory } from "@/lib/api/offers";
+import type { Attachment, FormErrors, OfferFormData } from "@/types/client-offer.types";
+import {
+  INITIAL_FORM_DATA,
+  MIN_BUDGET,
+  MIN_DESCRIPTION_LENGTH,
+  MAX_ATTACHMENTS,
+  ALLOWED_IMAGE_TYPES,
+  ALLOWED_DOC_TYPES,
+  validateOfferForm,
+} from "@/data/client-offer.data";
 
-interface Attachment {
-  id: string;
-  file: File;
-  preview?: string;
-  type: "image" | "document";
-}
-
-interface OfferFormData {
-  title: string;
-  description: string;
-  budget: string;
-  category: string;
-  deadline: string;
-}
-
-interface FormErrors {
-  title?: string;
-  description?: string;
-  budget?: string;
-  category?: string;
-  deadline?: string;
-}
-
-const CATEGORIES = [
+const API_CATEGORIES: { value: OfferCategory | ""; label: string }[] = [
   { value: "", label: "Select a category" },
-  { value: "web-development", label: "Web Development" },
-  { value: "mobile-development", label: "Mobile Development" },
-  { value: "design", label: "Design & Creative" },
-  { value: "writing", label: "Writing & Translation" },
-  { value: "marketing", label: "Marketing & Sales" },
-  { value: "video", label: "Video & Animation" },
-  { value: "music", label: "Music & Audio" },
-  { value: "data", label: "Data & Analytics" },
-  { value: "other", label: "Other" },
+  { value: "WEB_DEVELOPMENT", label: "Web Development" },
+  { value: "MOBILE_DEVELOPMENT", label: "Mobile Development" },
+  { value: "DESIGN", label: "Design & Creative" },
+  { value: "WRITING", label: "Writing & Translation" },
+  { value: "MARKETING", label: "Marketing & Sales" },
+  { value: "VIDEO", label: "Video & Animation" },
+  { value: "MUSIC", label: "Music & Audio" },
+  { value: "DATA", label: "Data & Analytics" },
+  { value: "OTHER", label: "Other" },
 ];
-
-const INITIAL_FORM_DATA: OfferFormData = {
-  title: "",
-  description: "",
-  budget: "",
-  category: "",
-  deadline: "",
-};
-
-const MIN_TITLE_LENGTH = 10;
-const MIN_DESCRIPTION_LENGTH = 50;
-const MIN_BUDGET = 10;
-const MOCK_API_DELAY = 1500;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_ATTACHMENTS = 5;
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-const ALLOWED_DOC_TYPES = [
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "text/plain",
-];
-
-function validateOfferForm(formData: OfferFormData): FormErrors {
-  const errors: FormErrors = {};
-
-  if (!formData.title.trim()) {
-    errors.title = "Title is required";
-  } else if (formData.title.length < MIN_TITLE_LENGTH) {
-    errors.title = `Title must be at least ${MIN_TITLE_LENGTH} characters`;
-  }
-
-  if (!formData.description.trim()) {
-    errors.description = "Description is required";
-  } else if (formData.description.length < MIN_DESCRIPTION_LENGTH) {
-    errors.description = `Description must be at least ${MIN_DESCRIPTION_LENGTH} characters`;
-  }
-
-  if (!formData.budget.trim()) {
-    errors.budget = "Budget is required";
-  } else {
-    const budgetNum = parseFloat(formData.budget);
-    if (isNaN(budgetNum) || budgetNum < MIN_BUDGET) {
-      errors.budget = `Budget must be at least $${MIN_BUDGET}`;
-    }
-  }
-
-  if (!formData.category) {
-    errors.category = "Please select a category";
-  }
-
-  if (!formData.deadline) {
-    errors.deadline = "Deadline is required";
-  } else {
-    const deadlineDate = new Date(formData.deadline);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (deadlineDate < today) {
-      errors.deadline = "Deadline must be in the future";
-    }
-  }
-
-  return errors;
-}
-
-interface FormFieldProps {
-  label: string;
-  error?: string;
-  hint?: string;
-  optional?: boolean;
-  children: React.ReactNode;
-}
-
-function FormField({
-  label,
-  error,
-  hint,
-  optional,
-  children,
-}: FormFieldProps): React.JSX.Element {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-text-primary mb-2">
-        {label}
-        {optional && <span className="text-text-secondary font-normal"> (Optional)</span>}
-      </label>
-      {children}
-      {hint && <p className="mt-1 text-xs text-text-secondary">{hint}</p>}
-      {error && <p className="mt-1 text-sm text-error">{error}</p>}
-    </div>
-  );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-interface AttachmentPreviewProps {
-  attachment: Attachment;
-  onRemove: () => void;
-}
-
-function AttachmentPreview({ attachment, onRemove }: AttachmentPreviewProps): React.JSX.Element {
-  const iconPath = attachment.type === "image" ? ICON_PATHS.image : ICON_PATHS.document;
-
-  return (
-    <div
-      className={cn(
-        "relative group rounded-xl overflow-hidden",
-        "bg-background",
-        "shadow-[2px_2px_4px_#d1d5db,-2px_-2px_4px_#ffffff]"
-      )}
-    >
-      {attachment.type === "image" && attachment.preview ? (
-        <div className="aspect-square">
-          <img
-            src={attachment.preview}
-            alt={attachment.file.name}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      ) : (
-        <div className="aspect-square flex flex-col items-center justify-center p-3">
-          <Icon path={iconPath} size="xl" className="text-primary mb-2" />
-          <p className="text-xs text-text-primary text-center truncate w-full px-1">
-            {attachment.file.name.split(".").pop()?.toUpperCase()}
-          </p>
-        </div>
-      )}
-
-      <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2">
-        <p className="text-xs text-white truncate">{attachment.file.name}</p>
-        <p className="text-xs text-white/70">{formatFileSize(attachment.file.size)}</p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onRemove}
-        className={cn(
-          "absolute top-2 right-2",
-          "w-6 h-6 rounded-full",
-          "bg-error text-white",
-          "flex items-center justify-center",
-          "opacity-0 group-hover:opacity-100",
-          "transition-opacity duration-200",
-          "cursor-pointer"
-        )}
-      >
-        <Icon path={ICON_PATHS.close} size="sm" />
-      </button>
-    </div>
-  );
-}
 
 export default function CreateOfferPage(): React.JSX.Element {
   const router = useRouter();
   const { setMode } = useModeStore();
+  const token = useAuthStore((state) => state.token);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const [formData, setFormData] = useState<OfferFormData>(INITIAL_FORM_DATA);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -220,48 +60,25 @@ export default function CreateOfferPage(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>): void {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setAttachmentError(null);
+  function handleUpload(files: File[]): void {
 
     if (attachments.length + files.length > MAX_ATTACHMENTS) {
       setAttachmentError(`Maximum ${MAX_ATTACHMENTS} attachments allowed`);
       return;
     }
 
-    const newAttachments: Attachment[] = [];
-
-    Array.from(files).forEach((file) => {
-      if (file.size > MAX_FILE_SIZE) {
-        setAttachmentError(`File "${file.name}" exceeds 10MB limit`);
-        return;
-      }
-
+    setAttachmentError(null);
+    const newAttachments: Attachment[] = files.map((file) => {
       const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
-      const isDoc = ALLOWED_DOC_TYPES.includes(file.type);
-
-      if (!isImage && !isDoc) {
-        setAttachmentError(`File "${file.name}" is not a supported format`);
-        return;
-      }
-
-      const attachment: Attachment = {
+      return {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         file,
         type: isImage ? "image" : "document",
         preview: isImage ? URL.createObjectURL(file) : undefined,
       };
-
-      newAttachments.push(attachment);
     });
 
     setAttachments((prev) => [...prev, ...newAttachments]);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   }
 
   function removeAttachment(id: string): void {
@@ -287,6 +104,7 @@ export default function CreateOfferPage(): React.JSX.Element {
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
+    setApiError(null);
 
     const validationErrors = validateOfferForm(formData);
     setErrors(validationErrors);
@@ -295,11 +113,46 @@ export default function CreateOfferPage(): React.JSX.Element {
       return;
     }
 
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, MOCK_API_DELAY));
-    setIsLoading(false);
+    if (!token) {
+      setApiError("You must be logged in to create an offer");
+      return;
+    }
 
-    router.push("/app/client/dashboard");
+    setIsLoading(true);
+
+    try {
+      const budgetValue = parseFloat(formData.budget);
+      const offer = await createOffer(token, {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category as OfferCategory,
+        budget: budgetValue.toFixed(2),
+        deadline: formData.deadline,
+      });
+
+      // Upload attachments if any
+      if (attachments.length > 0) {
+        const uploadErrors: string[] = [];
+        for (const attachment of attachments) {
+          try {
+            await uploadAttachment(token, offer.id, attachment.file);
+          } catch (err) {
+            uploadErrors.push(
+              `Failed to upload "${attachment.file.name}": ${err instanceof Error ? err.message : "Unknown error"}`
+            );
+          }
+        }
+        if (uploadErrors.length > 0) {
+          console.warn("Some attachments failed to upload:", uploadErrors);
+        }
+      }
+
+      router.push("/app/client/offers?created=true");
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Failed to create offer");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const today = new Date().toISOString().split("T")[0];
@@ -345,7 +198,7 @@ export default function CreateOfferPage(): React.JSX.Element {
                       errors.category && INPUT_ERROR_STYLES
                     )}
                   >
-                    {CATEGORIES.map((cat) => (
+                    {API_CATEGORIES.map((cat) => (
                       <option key={cat.value} value={cat.value}>
                         {cat.label}
                       </option>
@@ -380,34 +233,12 @@ export default function CreateOfferPage(): React.JSX.Element {
                 Add images or documents to help freelancers understand your project better.
               </p>
 
-              <div
-                onClick={() => canAddMoreFiles && fileInputRef.current?.click()}
-                className={cn(
-                  "border-2 border-dashed border-border-light rounded-xl p-8",
-                  "flex flex-col items-center justify-center gap-3",
-                  "cursor-pointer",
-                  "hover:border-primary/50 hover:bg-primary/5",
-                  "transition-all duration-200",
-                  !canAddMoreFiles && "opacity-50 pointer-events-none"
-                )}
-              >
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Icon path={ICON_PATHS.image} size="lg" className="text-primary" />
-                </div>
-                <p className="text-sm text-text-primary font-medium">Click to upload files</p>
-                <p className="text-xs text-text-secondary">PNG, JPG, GIF, PDF, DOC up to 10MB each</p>
-              </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/jpeg,image/png,image/gif,image/webp,.pdf,.doc,.docx,.txt"
-                onChange={handleFileSelect}
-                className="hidden"
+              <ImageUpload
+                variant="multiple"
+                allowedTypes={[...ALLOWED_IMAGE_TYPES, ...ALLOWED_DOC_TYPES]}
+                onUpload={handleUpload}
+                error={attachmentError || undefined}
               />
-
-              {attachmentError && <p className="mt-3 text-sm text-error">{attachmentError}</p>}
 
               {attachments.length > 0 && (
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
@@ -450,17 +281,17 @@ export default function CreateOfferPage(): React.JSX.Element {
                 </FormField>
 
                 <FormField label="Deadline" error={errors.deadline}>
-                  <input
-                    type="date"
-                    name="deadline"
+                  <DatePicker
                     value={formData.deadline}
-                    onChange={handleChange}
-                    min={today}
-                    className={cn(
-                      NEUMORPHIC_INPUT,
-                      "cursor-pointer",
-                      errors.deadline && INPUT_ERROR_STYLES
-                    )}
+                    onChange={(date) => {
+                      setFormData((prev) => ({ ...prev, deadline: date }));
+                      if (errors.deadline) {
+                        setErrors((prev) => ({ ...prev, deadline: undefined }));
+                      }
+                    }}
+                    minDate={today}
+                    error={!!errors.deadline}
+                    placeholder="Select deadline"
                   />
                 </FormField>
               </div>
@@ -469,7 +300,16 @@ export default function CreateOfferPage(): React.JSX.Element {
             <div className={NEUMORPHIC_CARD}>
               <h2 className="text-lg font-semibold text-text-primary mb-4">Actions</h2>
               <div className="space-y-3">
-                <button type="submit" disabled={isLoading} className={cn(PRIMARY_BUTTON, "w-full justify-center")}>
+                {apiError && (
+                  <div className="p-3 rounded-lg bg-error/10 text-error text-sm">
+                    {apiError}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={cn(PRIMARY_BUTTON, "w-full justify-center")}
+                >
                   {isLoading ? (
                     <span className="flex items-center gap-2 justify-center">
                       <LoadingSpinner />

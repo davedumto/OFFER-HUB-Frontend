@@ -18,4 +18,5 @@ export interface FreelancerActivity {
   title: string;
   description: string;
   time: string;
+  createdAt: string;
 }
