@@ -125,41 +125,46 @@ export function ServiceCard({ service, className }: ServiceCardProps): React.JSX
       </div>
 
       {/* Stats Section */}
-      <div className={cn(
-        "grid grid-cols-3 gap-3 p-4 rounded-2xl mb-5",
-        "bg-background",
-        "shadow-[inset_2px_2px_4px_#d1d5db,inset_-2px_-2px_4px_#ffffff]"
-      )}>
-        <div className="flex flex-col items-center">
-          <Icon path={ICON_PATHS.briefcase} size="sm" className="text-text-secondary mb-1" />
-          <span className="text-sm font-bold text-text-primary">{service.totalOrders}</span>
-          <span className="text-[10px] text-text-secondary uppercase">Orders</span>
+      <div className="flex items-center justify-between mb-5 pt-4 border-t border-border-light">
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-8 h-8 rounded-lg flex items-center justify-center",
+            "bg-background shadow-[2px_2px_4px_#d1d5db,-2px_-2px_4px_#ffffff]"
+          )}>
+            <Icon path={ICON_PATHS.briefcase} size="sm" className="text-text-secondary" />
+          </div>
+          <span className="text-sm font-semibold text-text-primary">{service.totalOrders} orders</span>
         </div>
-        <div className="flex flex-col items-center border-x border-border-light">
-          <Icon path={ICON_PATHS.clock} size="sm" className="text-text-secondary mb-1" />
-          <span className="text-sm font-bold text-text-primary">{service.deliveryDays}d</span>
-          <span className="text-[10px] text-text-secondary uppercase">Delivery</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <Icon path={ICON_PATHS.currency} size="sm" className="text-primary mb-1" />
-          <span className="text-sm font-bold text-primary">${price.toLocaleString()}</span>
-          <span className="text-[10px] text-text-secondary uppercase">Price</span>
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-8 h-8 rounded-lg flex items-center justify-center",
+            "bg-background shadow-[2px_2px_4px_#d1d5db,-2px_-2px_4px_#ffffff]"
+          )}>
+            <Icon path={ICON_PATHS.clock} size="sm" className="text-text-secondary" />
+          </div>
+          <span className="text-sm font-semibold text-text-primary">{service.deliveryDays} days</span>
         </div>
       </div>
 
-      {/* CTA Button */}
-      <button
-        className={cn(
-          "w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200",
-          "bg-primary text-white",
-          "shadow-[4px_4px_8px_#d1d5db,-4px_-4px_8px_#ffffff]",
-          "hover:shadow-[2px_2px_4px_#d1d5db,-2px_-2px_4px_#ffffff]",
-          "active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.1)]",
-          "group-hover:bg-primary-hover"
-        )}
-      >
-        View Service
-      </button>
+      {/* Price & CTA */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col">
+          <span className="text-xs text-text-secondary">Starting at</span>
+          <span className="text-2xl font-bold text-primary">${price.toLocaleString()}</span>
+        </div>
+        <button
+          className={cn(
+            "flex-1 py-3 rounded-xl font-semibold text-sm transition-all duration-200",
+            "bg-primary text-white",
+            "shadow-[4px_4px_8px_#d1d5db,-4px_-4px_8px_#ffffff]",
+            "hover:shadow-[2px_2px_4px_#d1d5db,-2px_-2px_4px_#ffffff]",
+            "active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.1)]",
+            "group-hover:bg-primary-hover"
+          )}
+        >
+          View Service
+        </button>
+      </div>
     </Link>
   );
 }
