@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { Country } from "country-state-city";
 import { cn } from "@/lib/cn";
-import { MOCK_API_DELAY } from "@/lib/constants";
 import { useAuthStore } from "@/stores/auth-store";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import {
@@ -12,6 +12,8 @@ import {
   PRIMARY_BUTTON,
 } from "@/lib/styles";
 import { ImageUpload } from "@/components/ui/ImageUpload";
+import { getProfile, updateProfile } from "@/lib/api/profile";
+import { uploadImage } from "@/lib/api/upload";
 
 interface ProfileFormData {
   firstName: string;
@@ -19,12 +21,7 @@ interface ProfileFormData {
   email: string;
   username: string;
   bio: string;
-  location: string;
-  website: string;
-  phone: string;
 }
-
-type FormFieldName = keyof ProfileFormData;
 
 interface FormErrors {
   firstName?: string;
@@ -32,12 +29,11 @@ interface FormErrors {
   email?: string;
   username?: string;
   bio?: string;
-  phone?: string;
 }
 
 interface FormInputProps {
   label: string;
-  name: FormFieldName;
+  name: keyof ProfileFormData;
   type?: string;
   value: string;
   placeholder: string;
@@ -55,7 +51,7 @@ function FormInput({
   error,
   onChange,
   className,
-}: FormInputProps): React.JSX.Element {
+}: FormInputProps) {
   return (
     <div className={className}>
       <label className="block text-sm font-medium text-text-primary mb-2">{label}</label>
@@ -73,7 +69,6 @@ function FormInput({
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[+]?[\d\s-()]+$/;
 const MIN_USERNAME_LENGTH = 3;
 const MAX_BIO_LENGTH = 500;
 const SUCCESS_MESSAGE_DURATION = 3000;
@@ -84,9 +79,6 @@ const INITIAL_FORM_DATA: ProfileFormData = {
   email: "",
   username: "",
   bio: "",
-  location: "",
-  website: "",
-  phone: "",
 };
 
 function validateProfileForm(formData: ProfileFormData): FormErrors {
@@ -116,38 +108,73 @@ function validateProfileForm(formData: ProfileFormData): FormErrors {
     errors.bio = `Bio must be less than ${MAX_BIO_LENGTH} characters`;
   }
 
-  if (formData.phone && !PHONE_REGEX.test(formData.phone)) {
-    errors.phone = "Please enter a valid phone number";
-  }
-
   return errors;
 }
 
-export default function ProfilePage(): React.JSX.Element {
-  const user = useAuthStore((state) => state.user);
+export default function ProfilePage() {
+  const token = useAuthStore((state) => state.token);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [formData, setFormData] = useState<ProfileFormData>(INITIAL_FORM_DATA);
-  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  // Get all countries - simple list without flags
+  const countries = useMemo(() => Country.getAllCountries(), []);
+
+  // Wait for Zustand to hydrate from localStorage
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
-    if (user) {
-      const nameParts = user.username.split(" ");
-      setFormData({
-        firstName: nameParts[0] || user.username,
-        lastName: nameParts.slice(1).join(" ") || "",
-        email: user.email,
-        username: user.username,
-        bio: "I'm a passionate professional looking to connect and collaborate on exciting projects.",
-        location: "San Francisco, CA",
-        website: "",
-        phone: "",
-      });
-    }
-  }, [user]);
+    async function loadProfile() {
+      // Wait for hydration before checking token
+      if (!isHydrated || !token) {
+        if (isHydrated) {
+          setIsFetching(false);
+        }
+        return;
+      }
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void {
+      try {
+        const profile = await getProfile(token);
+
+        setFormData({
+          firstName: profile.firstName || "",
+          lastName: profile.lastName || "",
+          email: profile.email || "",
+          username: profile.username || "",
+          bio: profile.bio || "",
+        });
+
+        // Set avatar URL, but filter out invalid blob URLs from database
+        setAvatarUrl(profile.avatarUrl?.startsWith('blob:') ? null : profile.avatarUrl);
+
+        // Set country from profile
+        if (profile.country) {
+          const country = Country.getAllCountries().find(
+            c => c.name.toLowerCase() === profile.country?.toLowerCase()
+          );
+          if (country) {
+            setSelectedCountry(country.isoCode);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load profile:", error);
+      } finally {
+        setIsFetching(false);
+      }
+    }
+
+    loadProfile();
+  }, [token, isHydrated]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name as keyof FormErrors]) {
@@ -155,13 +182,46 @@ export default function ProfilePage(): React.JSX.Element {
     }
   }
 
-  function handlePhotoUpload(files: File[]): void {
-    if (files.length > 0) {
-      setProfilePhoto(files[0]);
+  async function handleImageUpload(files: File[]) {
+    if (files.length === 0 || !token) return;
+
+    const file = files[0];
+
+    // Create a local preview URL for immediate feedback
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarUrl(previewUrl);
+    setIsUploadingImage(true);
+
+    try {
+      // Upload image to Cloudinary via backend
+      const result = await uploadImage(file, token, "avatars");
+
+      // Replace preview URL with the actual uploaded URL
+      URL.revokeObjectURL(previewUrl);
+      setAvatarUrl(result.url);
+
+      console.log("Image uploaded successfully:", result.url);
+
+      // Immediately save the avatar URL to the database
+      await updateProfile(token, {
+        avatarUrl: result.url,
+      });
+
+      console.log("Avatar URL saved to profile");
+    } catch (error) {
+      console.error("Failed to upload image:", error);
+
+      // Revert to previous avatar on error
+      URL.revokeObjectURL(previewUrl);
+      setAvatarUrl(null);
+
+      setErrors({ firstName: error instanceof Error ? error.message : "Failed to upload image" });
+    } finally {
+      setIsUploadingImage(false);
     }
   }
 
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     const validationErrors = validateProfileForm(formData);
@@ -171,11 +231,48 @@ export default function ProfilePage(): React.JSX.Element {
       return;
     }
 
+    if (!token) {
+      setErrors({ firstName: "Authentication token not found. Please log in again." });
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, MOCK_API_DELAY));
-    setIsLoading(false);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), SUCCESS_MESSAGE_DURATION);
+
+    try {
+      // Find country name from code
+      const countryName = countries.find(c => c.isoCode === selectedCountry)?.name || "";
+
+      // Don't send blob URLs to backend - they're not persistent
+      const avatarToSend = avatarUrl?.startsWith('blob:') ? undefined : avatarUrl || undefined;
+
+      await updateProfile(token, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        username: formData.username,
+        bio: formData.bio,
+        country: countryName,
+        avatarUrl: avatarToSend,
+      });
+
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), SUCCESS_MESSAGE_DURATION);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      setErrors({ firstName: error instanceof Error ? error.message : "Failed to update profile" });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  if (isFetching) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <LoadingSpinner />
+          <p className="text-text-secondary">Loading profile...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -184,7 +281,7 @@ export default function ProfilePage(): React.JSX.Element {
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Profile Settings</h1>
           <p className="text-text-secondary text-sm">
-            Manage your account information and preferences
+            Manage your account information
           </p>
         </div>
         {showSuccess && (
@@ -205,9 +302,14 @@ export default function ProfilePage(): React.JSX.Element {
 
       <div className={NEUMORPHIC_CARD}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <ImageUpload variant="single" label="Profile Photo" onUpload={handlePhotoUpload} />
+          <ImageUpload
+            variant="single"
+            label="Profile Photo"
+            currentImage={avatarUrl || undefined}
+            onUpload={handleImageUpload}
+          />
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <FormInput
               label="First Name"
               name="firstName"
@@ -241,39 +343,29 @@ export default function ProfilePage(): React.JSX.Element {
               error={errors.email}
               onChange={handleChange}
             />
-            <FormInput
-              label="Phone"
-              name="phone"
-              type="tel"
-              value={formData.phone}
-              placeholder="+1 (555) 000-0000"
-              error={errors.phone}
-              onChange={handleChange}
-            />
-            <FormInput
-              label="Location"
-              name="location"
-              value={formData.location}
-              placeholder="City, Country"
-              onChange={handleChange}
-            />
-            <FormInput
-              label="Website"
-              name="website"
-              type="url"
-              value={formData.website}
-              placeholder="https://yourwebsite.com"
-              onChange={handleChange}
-              className="col-span-2 lg:col-span-3"
-            />
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Country</label>
+              <select
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                className={cn(NEUMORPHIC_INPUT, "pr-10")}
+              >
+                <option value="">Select country...</option>
+                {countries.map((country) => (
+                  <option key={country.isoCode} value={country.isoCode}>
+                    {country.flag} {country.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <div className="col-span-2 lg:col-span-3">
-              <label className="block text-sm font-medium text-text-primary mb-1">Bio</label>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-text-primary mb-1">Bio (Optional)</label>
               <textarea
                 name="bio"
                 value={formData.bio}
                 onChange={handleChange}
-                rows={2}
+                rows={3}
                 className={cn(NEUMORPHIC_INPUT, "resize-none", errors.bio && INPUT_ERROR_STYLES)}
                 placeholder="Tell us about yourself..."
               />

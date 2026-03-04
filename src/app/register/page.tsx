@@ -83,6 +83,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
+          username: formData.username,
           type: "BOTH",
         }),
       });
@@ -90,7 +91,40 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setErrors({ email: data.error || "Registration failed" });
+        const newErrors: AuthFormErrors = {};
+
+        // Handle structured error responses from backend
+        if (data.error?.code) {
+          // ConflictException with error codes
+          if (data.error.code === "EMAIL_ALREADY_EXISTS") {
+            newErrors.email = data.error.message || "This email is already registered";
+          } else if (data.error.code === "USERNAME_TAKEN") {
+            newErrors.username = data.error.message || "This username is already taken";
+          } else if (data.error.code === "VALIDATION_ERROR" && data.error.details?.validationErrors) {
+            // Validation errors from class-validator
+            const validationErrors = data.error.details.validationErrors as string[];
+            validationErrors.forEach((msg: string) => {
+              const msgLower = msg.toLowerCase();
+              if (msgLower.includes("email")) {
+                newErrors.email = msg;
+              } else if (msgLower.includes("username")) {
+                newErrors.username = msg;
+              } else if (msgLower.includes("password")) {
+                newErrors.password = msg;
+              } else {
+                newErrors.email = msg;
+              }
+            });
+          } else {
+            // Generic error with code
+            newErrors.email = data.error.message || "Registration failed";
+          }
+        } else {
+          // Fallback for unknown error format
+          newErrors.email = data.error || "Registration failed";
+        }
+
+        setErrors(newErrors);
         setIsLoading(false);
         return;
       }

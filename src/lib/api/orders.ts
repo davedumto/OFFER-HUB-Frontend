@@ -1,6 +1,5 @@
 import type { Order, CreateOrderPayload, Milestone } from '@/types/order.types';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { API_URL } from "@/config/api";
 
 export async function createOrder(token: string, payload: CreateOrderPayload): Promise<Order> {
   const response = await fetch(`${API_URL}/orders`, {

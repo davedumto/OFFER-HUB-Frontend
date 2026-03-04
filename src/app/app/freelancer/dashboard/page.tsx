@@ -156,42 +156,43 @@ export default function FreelancerDashboardPage(): React.JSX.Element {
     }
   }, [mounted, token]);
 
+  if (!mounted) return <div className="min-h-screen bg-background" />;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">
-          Welcome back, {user?.username || "Freelancer"}!
+    <div className="space-y-8 pb-10">
+      <div className="animate-fade-in-up">
+        <h1 className="text-3xl font-extrabold text-text-primary tracking-tight">
+          Welcome back, <span className="text-primary">{user?.username || "Freelancer"}</span>!
         </h1>
-        <p className="text-text-secondary mt-1">
+        <p className="text-text-secondary mt-2 text-lg">
           Manage your services and grow your freelance business
         </p>
         {mounted && user?.wallet?.publicKey && (
-          <div className="mt-3">
+          <div className="mt-4 inline-block">
             <WalletAddress address={user.wallet.publicKey} />
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 stagger-2 animate-fade-in-up">
         <QuickAction
           href="/app/freelancer/services/new"
           iconPath={ICON_PATHS.plus}
-          iconColor="bg-primary"
+          iconColor="bg-primary/90 shadow-lg shadow-primary/20"
           title="Create Service"
           description="Offer a new service to clients"
         />
         <QuickAction
           href="/app/freelancer/profile"
           iconPath={ICON_PATHS.user}
-          iconColor="bg-secondary"
+          iconColor="bg-secondary/90 shadow-lg shadow-secondary/20"
           title="View Profile"
           description="Update your freelancer profile"
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 stagger-3 animate-fade-in-up">
         {isLoadingStats ? (
-          // Loading skeleton
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className={cn(NEUMORPHIC_CARD, "animate-pulse")}>
               <div className="flex items-center gap-4">
@@ -205,15 +206,21 @@ export default function FreelancerDashboardPage(): React.JSX.Element {
           ))
         ) : (
           <>
-            <StatCard
-              label="Active Services"
-              value={stats?.activeServices ?? 0}
-              iconPath={ICON_PATHS.briefcase}
-              color="bg-primary"
-            />
-            <div className={NEUMORPHIC_CARD}>
+            <div className={cn(NEUMORPHIC_CARD, "group transition-all duration-300 hover:-translate-y-1 hover:shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff]")}>
               <div className="flex items-center gap-4">
-                <div className={cn(ICON_CONTAINER, "bg-success")}>
+                <div className={cn(ICON_CONTAINER, "bg-primary group-hover:scale-110 transition-transform duration-500")}>
+                  <Icon path={ICON_PATHS.briefcase} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary">{stats?.activeServices ?? 0}</p>
+                  <p className="text-sm text-text-secondary">Active Services</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={cn(NEUMORPHIC_CARD, "group transition-all duration-300 hover:-translate-y-1 hover:shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff]")}>
+              <div className="flex items-center gap-4">
+                <div className={cn(ICON_CONTAINER, "bg-success group-hover:scale-110 transition-transform duration-500")}>
                   <Icon path={ICON_PATHS.currency} className="text-white" />
                 </div>
                 <div className="flex-1">
@@ -226,44 +233,54 @@ export default function FreelancerDashboardPage(): React.JSX.Element {
                       </span>
                     )}
                   </div>
-                  {stats?.stellarBalance && stats.stellarBalance !== 'Unknown' && (
-                    <p className="text-xs text-text-secondary mt-1">
-                      Stellar: {stats.stellarBalance}
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
-            <StatCard
-              label="Pending Proposals"
-              value={stats?.pendingProposals ?? 0}
-              iconPath={ICON_PATHS.document}
-              color="bg-secondary"
-            />
-            <StatCard
-              label="Unread Messages"
-              value={stats?.unreadMessages ?? 0}
-              iconPath={ICON_PATHS.chat}
-              color="bg-accent"
-            />
+
+            <div className={cn(NEUMORPHIC_CARD, "group transition-all duration-300 hover:-translate-y-1 hover:shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff]")}>
+              <div className="flex items-center gap-4">
+                <div className={cn(ICON_CONTAINER, "bg-secondary group-hover:scale-110 transition-transform duration-500")}>
+                  <Icon path={ICON_PATHS.document} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary">{stats?.pendingProposals ?? 0}</p>
+                  <p className="text-sm text-text-secondary">Pending Proposals</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={cn(NEUMORPHIC_CARD, "group transition-all duration-300 hover:-translate-y-1 hover:shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff]")}>
+              <div className="flex items-center gap-4">
+                <div className={cn(ICON_CONTAINER, "bg-accent group-hover:scale-110 transition-transform duration-500")}>
+                  <Icon path={ICON_PATHS.chat} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary">{stats?.unreadMessages ?? 0}</p>
+                  <p className="text-sm text-text-secondary">Unread Messages</p>
+                </div>
+              </div>
+            </div>
           </>
         )}
       </div>
 
-      <div className={NEUMORPHIC_CARD}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-text-primary">Recent Activity</h2>
+      <div className={cn(NEUMORPHIC_CARD, "stagger-4 animate-fade-in-up border border-white/40")}>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-xl font-bold text-text-primary">Recent Activity</h2>
+            <p className="text-sm text-text-secondary mt-1">Stay updated with your latest transactions and jobs</p>
+          </div>
           <Link
             href="/app/freelancer/activities"
-            className="text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer"
+            className="group flex items-center gap-2 px-4 py-2 rounded-full bg-background text-sm font-semibold text-primary shadow-sm hover:shadow-md transition-all active:scale-95"
           >
             View all
+            <Icon path={ICON_PATHS.chevronRight} size="sm" className="group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
           {isLoadingActivities ? (
-            // Loading skeleton
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className={cn("flex items-start gap-4 p-4 rounded-xl animate-pulse", NEUMORPHIC_INSET)}>
                 <div className="w-10 h-10 rounded-lg bg-gray-200 flex-shrink-0" />
@@ -275,12 +292,17 @@ export default function FreelancerDashboardPage(): React.JSX.Element {
               </div>
             ))
           ) : activities.length > 0 ? (
-            activities.slice(0, 5).map((activity) => (
-              <ActivityItem key={activity.id} activity={activity} />
+            activities.slice(0, 5).map((activity, idx) => (
+              <div key={activity.id} className={cn("animate-fade-in")} style={{ animationDelay: `${0.1 * idx}s` }}>
+                <ActivityItem activity={activity} />
+              </div>
             ))
           ) : (
-            <div className="text-center text-text-secondary py-8">
-              No recent activity
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 bg-background rounded-full flex items-center justify-center mb-4 shadow-inner">
+                <Icon path={ICON_PATHS.calendar} size="lg" className="text-text-secondary/30" />
+              </div>
+              <p className="text-text-secondary font-medium">No recent activity to show</p>
             </div>
           )}
         </div>

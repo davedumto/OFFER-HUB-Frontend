@@ -23,7 +23,6 @@ const CATEGORY_MAP: Record<string, string> = {
 };
 
 export function OfferCard({ offer, className }: OfferCardProps): React.JSX.Element {
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:4000";
   const budget = parseFloat(offer.budget);
   const deadline = new Date(offer.deadline).toLocaleDateString("en-US", {
     month: "short",

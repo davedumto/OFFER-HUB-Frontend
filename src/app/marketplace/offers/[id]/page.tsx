@@ -11,6 +11,7 @@ import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Navbar } from "@/components/landing/Navbar";
 import { cn } from "@/lib/cn";
+import { BACKEND_URL } from "@/config/api";
 
 const CATEGORY_MAP: Record<string, string> = {
   WEB_DEVELOPMENT: "Web Development",
@@ -91,7 +92,7 @@ export default function OfferDetailPage(): React.JSX.Element {
     );
   }
 
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:4000";
+  const backendUrl = BACKEND_URL;
   const budget = parseFloat(offer.budget);
   const deadline = new Date(offer.deadline).toLocaleDateString("en-US", {
     month: "long",

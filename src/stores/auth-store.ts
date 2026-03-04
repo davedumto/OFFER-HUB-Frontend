@@ -16,6 +16,7 @@ export interface User {
   id: string;
   email: string;
   username: string;
+  avatarUrl?: string;
   type?: "BUYER" | "SELLER" | "BOTH";
   balance?: UserBalance;
   wallet?: UserWallet;

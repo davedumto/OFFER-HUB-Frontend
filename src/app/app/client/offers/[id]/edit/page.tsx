@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { BACKEND_URL } from "@/config/api";
 import { useModeStore } from "@/stores/mode-store";
 import { useAuthStore } from "@/stores/auth-store";
 import {
@@ -282,7 +283,7 @@ export default function EditOfferPage(): React.JSX.Element {
   const totalAttachments = existingAttachments.length + attachments.length;
   const canAddMoreFiles = totalAttachments < MAX_ATTACHMENTS;
   const detailHref = `/app/client/offers/${offerId}`;
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:4000";
+  const backendUrl = BACKEND_URL;
 
   return (
     <div className="space-y-6">

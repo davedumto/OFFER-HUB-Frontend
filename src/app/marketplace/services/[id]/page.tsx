@@ -75,7 +75,6 @@ export default function ServiceDetailPage(): React.JSX.Element {
     );
   }
 
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:4000";
   const price = parseFloat(service.price);
   const averageRating = service.averageRating ? parseFloat(service.averageRating) : null;
   const category = CATEGORY_MAP[service.category] || service.category;

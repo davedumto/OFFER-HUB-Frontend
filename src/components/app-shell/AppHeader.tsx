@@ -34,12 +34,14 @@ function isActiveLink(pathname: string, href: string): boolean {
 }
 
 export function AppHeader({ onMenuClick }: AppHeaderProps): React.JSX.Element {
+  const [mounted, setMounted] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
 
   useEffect(() => {
+    setMounted(true);
     function handleClickOutside(event: MouseEvent): void {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
@@ -113,37 +115,65 @@ export function AppHeader({ onMenuClick }: AppHeaderProps): React.JSX.Element {
           <span className="absolute top-1 right-1 w-2 h-2 bg-error rounded-full" />
         </button>
 
-        {user && (
+        {mounted && user && (
           <div ref={userMenuRef} className="relative">
-            <button onClick={toggleUserMenu} className={USER_AVATAR_BUTTON}>
-              {user.username.charAt(0).toUpperCase()}
+            <button
+              onClick={toggleUserMenu}
+              className={cn(
+                USER_AVATAR_BUTTON,
+                "overflow-hidden transition-all duration-300",
+                isUserMenuOpen && "shadow-[inset_4px_4px_8px_#d1d5db,inset_-4px_-4px_8px_#ffffff]"
+              )}
+            >
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.username}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="animate-fade-in">{user.username.charAt(0).toUpperCase()}</span>
+              )}
             </button>
 
             {isUserMenuOpen && (
-              <div className={DROPDOWN_MENU}>
-                <div className="px-4 py-2 border-b border-border-light">
-                  <p className="text-sm font-medium text-text-primary truncate">
+              <div className={cn(DROPDOWN_MENU, "-right-1 top-[calc(100%+0.75rem)]")}>
+                <div className="px-5 py-4 mb-2 border-b border-background">
+                  <p className="text-sm font-bold text-text-primary truncate">
                     {user.username}
                   </p>
-                  <p className="text-xs text-text-secondary truncate">{user.email}</p>
+                  <p className="text-xs text-text-secondary truncate mt-0.5">{user.email}</p>
                 </div>
-                <Link href="/app/dashboard" onClick={closeUserMenu} className={DROPDOWN_ITEM}>
-                  <Icon path={ICON_PATHS.home} size="sm" className="text-text-secondary" />
-                  Dashboard
-                </Link>
-                <Link href="/app/profile" onClick={closeUserMenu} className={DROPDOWN_ITEM}>
-                  <Icon path={ICON_PATHS.user} size="sm" className="text-text-secondary" />
-                  My Profile
-                </Link>
-                <Link href="/app/settings" onClick={closeUserMenu} className={DROPDOWN_ITEM}>
-                  <Icon path={ICON_PATHS.settings} size="sm" className="text-text-secondary" />
-                  Settings
-                </Link>
-                <div className="border-t border-border-light my-1" />
-                <button onClick={handleLogout} className={DROPDOWN_ITEM_DANGER}>
-                  <Icon path={ICON_PATHS.logout} size="sm" />
-                  Sign Out
-                </button>
+                <div className="flex flex-col gap-1 pb-3">
+                  <Link href="/app/dashboard" onClick={closeUserMenu} className={cn(DROPDOWN_ITEM, "stagger-1")}>
+                    <div className="flex items-center gap-3">
+                      <Icon path={ICON_PATHS.home} size="sm" className="group-hover:text-primary transition-colors" />
+                      <span>Dashboard</span>
+                    </div>
+                    <Icon path={ICON_PATHS.chevronRight} size="sm" className="opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                  </Link>
+                  <Link href="/app/profile" onClick={closeUserMenu} className={cn(DROPDOWN_ITEM, "stagger-2")}>
+                    <div className="flex items-center gap-3">
+                      <Icon path={ICON_PATHS.user} size="sm" className="group-hover:text-primary transition-colors" />
+                      <span>My Profile</span>
+                    </div>
+                    <Icon path={ICON_PATHS.chevronRight} size="sm" className="opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                  </Link>
+                  <Link href="/app/settings" onClick={closeUserMenu} className={cn(DROPDOWN_ITEM, "stagger-3")}>
+                    <div className="flex items-center gap-3">
+                      <Icon path={ICON_PATHS.settings} size="sm" className="group-hover:text-primary transition-colors" />
+                      <span>Settings</span>
+                    </div>
+                    <Icon path={ICON_PATHS.chevronRight} size="sm" className="opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                  </Link>
+                  <div className="border-t border-background my-2 mx-4" />
+                  <button onClick={handleLogout} className={cn(DROPDOWN_ITEM_DANGER, "stagger-4")}>
+                    <div className="flex items-center gap-3">
+                      <Icon path={ICON_PATHS.logout} size="sm" />
+                      <span>Sign Out</span>
+                    </div>
+                  </button>
+                </div>
               </div>
             )}
           </div>

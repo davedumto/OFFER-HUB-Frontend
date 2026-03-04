@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const ORCHESTRATOR_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+import { API_URL } from "@/config/api";
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
 
-    // Call Orchestrator login endpoint
-    const response = await fetch(`${ORCHESTRATOR_URL}/auth/login`, {
+    // Call API login endpoint
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json(
-      { error: "Connection error. Is the Orchestrator running?" },
+      { error: "Unable to connect to server. Please try again." },
       { status: 500 }
     );
   }

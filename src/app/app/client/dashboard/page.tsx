@@ -176,40 +176,42 @@ export default function ClientDashboardPage(): React.JSX.Element {
     };
   }, [mounted, fetchData]);
 
+  if (!mounted) return <div className="min-h-screen bg-background" />;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">
-          Welcome back, {user?.username || "Client"}!
+    <div className="space-y-8 pb-10">
+      <div className="animate-fade-in-up">
+        <h1 className="text-3xl font-extrabold text-text-primary tracking-tight">
+          Welcome back, <span className="text-primary">{user?.username || "Client"}</span>!
         </h1>
-        <p className="text-text-secondary mt-1">
-          Find talented freelancers and manage your projects
+        <p className="text-text-secondary mt-2 text-lg">
+          Find talented freelancers and manage your projects effectively
         </p>
         {mounted && user?.wallet?.publicKey && (
-          <div className="mt-3">
+          <div className="mt-4 inline-block">
             <WalletAddress address={user.wallet.publicKey} />
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 stagger-2 animate-fade-in-up">
         <QuickAction
           href="/app/client/offers/new"
           iconPath={ICON_PATHS.plus}
-          iconColor="bg-primary"
+          iconColor="bg-primary/90 shadow-lg shadow-primary/20"
           title="Create Offer"
           description="Post a new job opportunity"
         />
         <QuickAction
           href="/app/client/offers"
           iconPath={ICON_PATHS.briefcase}
-          iconColor="bg-secondary"
+          iconColor="bg-secondary/90 shadow-lg shadow-secondary/20"
           title="View Offers"
           description="Manage your posted offers"
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 stagger-3 animate-fade-in-up">
         {isLoadingStats ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className={cn(NEUMORPHIC_CARD, "animate-pulse")}>
@@ -224,46 +226,73 @@ export default function ClientDashboardPage(): React.JSX.Element {
           ))
         ) : (
           <>
-            <StatCard
-              label="Active Offers"
-              value={stats?.activeOffers ?? 0}
-              iconPath={ICON_PATHS.document}
-              color="bg-primary"
-            />
-            <StatCard
-              label="Active Orders"
-              value={stats?.activeOrders ?? 0}
-              iconPath={ICON_PATHS.briefcase}
-              color="bg-secondary"
-            />
-            <StatCard
-              label="Services Purchased"
-              value={stats?.servicesPurchased ?? 0}
-              iconPath={ICON_PATHS.check}
-              color="bg-accent"
-            />
-            <StatCard
-              label="Budget Spent"
-              value={stats?.budgetSpent ?? "$0.00"}
-              iconPath={ICON_PATHS.currency}
-              color="bg-success"
-            />
+            <div className={cn(NEUMORPHIC_CARD, "group transition-all duration-300 hover:-translate-y-1 hover:shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff]")}>
+              <div className="flex items-center gap-4">
+                <div className={cn(ICON_CONTAINER, "bg-primary group-hover:scale-110 transition-transform duration-500")}>
+                  <Icon path={ICON_PATHS.document} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary">{stats?.activeOffers ?? 0}</p>
+                  <p className="text-sm text-text-secondary">Active Offers</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={cn(NEUMORPHIC_CARD, "group transition-all duration-300 hover:-translate-y-1 hover:shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff]")}>
+              <div className="flex items-center gap-4">
+                <div className={cn(ICON_CONTAINER, "bg-secondary group-hover:scale-110 transition-transform duration-500")}>
+                  <Icon path={ICON_PATHS.briefcase} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary">{stats?.activeOrders ?? 0}</p>
+                  <p className="text-sm text-text-secondary">Active Orders</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={cn(NEUMORPHIC_CARD, "group transition-all duration-300 hover:-translate-y-1 hover:shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff]")}>
+              <div className="flex items-center gap-4">
+                <div className={cn(ICON_CONTAINER, "bg-accent group-hover:scale-110 transition-transform duration-500")}>
+                  <Icon path={ICON_PATHS.check} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary">{stats?.servicesPurchased ?? 0}</p>
+                  <p className="text-sm text-text-secondary">Services Purchased</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={cn(NEUMORPHIC_CARD, "group transition-all duration-300 hover:-translate-y-1 hover:shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff]")}>
+              <div className="flex items-center gap-4">
+                <div className={cn(ICON_CONTAINER, "bg-success group-hover:scale-110 transition-transform duration-500")}>
+                  <Icon path={ICON_PATHS.currency} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-text-primary">{stats?.budgetSpent ?? "$0.00"}</p>
+                  <p className="text-sm text-text-secondary">Budget Spent</p>
+                </div>
+              </div>
+            </div>
           </>
         )}
       </div>
 
-      <div className={NEUMORPHIC_CARD}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-text-primary">Recent Activity</h2>
+      <div className={cn(NEUMORPHIC_CARD, "stagger-4 animate-fade-in-up border border-white/40")}>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-xl font-bold text-text-primary">Recent Activity</h2>
+            <p className="text-sm text-text-secondary mt-1">Track your project status and hired services</p>
+          </div>
           <Link
             href="/app/client/activities"
-            className="text-sm text-primary hover:text-primary-hover transition-colors cursor-pointer"
+            className="group flex items-center gap-2 px-4 py-2 rounded-full bg-background text-sm font-semibold text-primary shadow-sm hover:shadow-md transition-all active:scale-95"
           >
             View all
+            <Icon path={ICON_PATHS.chevronRight} size="sm" className="group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
           {isLoadingActivities ? (
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className={cn("flex items-start gap-4 p-4 rounded-xl animate-pulse", NEUMORPHIC_INSET)}>
@@ -276,12 +305,17 @@ export default function ClientDashboardPage(): React.JSX.Element {
               </div>
             ))
           ) : activities.length > 0 ? (
-            activities.slice(0, 5).map((activity) => (
-              <ActivityItem key={activity.id} activity={activity} />
+            activities.slice(0, 5).map((activity, idx) => (
+              <div key={activity.id} className={cn("animate-fade-in")} style={{ animationDelay: `${0.1 * idx}s` }}>
+                <ActivityItem activity={activity} />
+              </div>
             ))
           ) : (
-            <div className="text-center text-text-secondary py-8">
-              No recent activity
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 bg-background rounded-full flex items-center justify-center mb-4 shadow-inner">
+                <Icon path={ICON_PATHS.calendar} size="lg" className="text-text-secondary/30" />
+              </div>
+              <p className="text-text-secondary font-medium">No recent activity to show</p>
             </div>
           )}
         </div>

@@ -1,51 +1,39 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { useAuthStore } from "@/stores/auth-store";
-import { useModeStore } from "@/stores/mode-store";
+import { useState, useEffect, useMemo } from "react";
+import { Country } from "country-state-city";
 import { cn } from "@/lib/cn";
-import { MOCK_API_DELAY } from "@/lib/constants";
+import { useAuthStore } from "@/stores/auth-store";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
 import {
   NEUMORPHIC_CARD,
   NEUMORPHIC_INPUT,
-  NEUMORPHIC_INSET,
   INPUT_ERROR_STYLES,
   PRIMARY_BUTTON,
 } from "@/lib/styles";
-import {
-  AVAILABILITY_OPTIONS,
-  SUGGESTED_SKILLS,
-  MOCK_FREELANCER_PROFILE,
-} from "@/data/freelancer-profile.data";
-import type {
-  FreelancerProfileData,
-  FreelancerProfileErrors,
-} from "@/types/freelancer-profile.types";
+import { ImageUpload } from "@/components/ui/ImageUpload";
+import { getProfile, updateProfile } from "@/lib/api/profile";
+import { uploadImage } from "@/lib/api/upload";
 
-const MAX_BIO_LENGTH = 500;
-const SUCCESS_MESSAGE_DURATION = 3000;
+interface ProfileFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  username: string;
+  bio: string;
+}
 
-const SECONDARY_BUTTON_STYLES = cn(
-  "px-4 py-2 text-sm font-medium rounded-xl",
-  "bg-background text-text-primary",
-  "shadow-[4px_4px_8px_#d1d5db,-4px_-4px_8px_#ffffff]",
-  "hover:shadow-[2px_2px_4px_#d1d5db,-2px_-2px_4px_#ffffff]",
-  "active:shadow-[inset_2px_2px_4px_#d1d5db,inset_-2px_-2px_4px_#ffffff]",
-  "transition-all duration-200 cursor-pointer"
-);
-
-const AVATAR_STYLES = cn(
-  "relative w-20 h-20 rounded-full flex items-center justify-center",
-  "bg-primary text-white text-2xl font-bold",
-  "shadow-[4px_4px_8px_#d1d5db,-4px_-4px_8px_#ffffff]"
-);
+interface FormErrors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  username?: string;
+  bio?: string;
+}
 
 interface FormInputProps {
   label: string;
-  name: string;
+  name: keyof ProfileFormData;
   type?: string;
   value: string;
   placeholder: string;
@@ -63,10 +51,10 @@ function FormInput({
   error,
   onChange,
   className,
-}: FormInputProps): React.JSX.Element {
+}: FormInputProps) {
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-text-primary mb-1">{label}</label>
+      <label className="block text-sm font-medium text-text-primary mb-2">{label}</label>
       <input
         type={type}
         name={name}
@@ -75,227 +63,213 @@ function FormInput({
         className={cn(NEUMORPHIC_INPUT, error && INPUT_ERROR_STYLES)}
         placeholder={placeholder}
       />
-      {error && <p className="mt-1 text-xs text-error">{error}</p>}
+      {error && <p className="mt-1 text-sm text-error">{error}</p>}
     </div>
   );
 }
 
-interface SkillTagProps {
-  skill: string;
-  onRemove: () => void;
-}
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_USERNAME_LENGTH = 3;
+const MAX_BIO_LENGTH = 500;
+const SUCCESS_MESSAGE_DURATION = 3000;
 
-function SkillTag({ skill, onRemove }: SkillTagProps): React.JSX.Element {
-  return (
-    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
-      {skill}
-      <button
-        type="button"
-        onClick={onRemove}
-        className="w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center cursor-pointer"
-      >
-        <Icon path={ICON_PATHS.close} size="sm" />
-      </button>
-    </span>
-  );
-}
+const INITIAL_FORM_DATA: ProfileFormData = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  username: "",
+  bio: "",
+};
 
-function validateForm(data: FreelancerProfileData): FreelancerProfileErrors {
-  const errors: FreelancerProfileErrors = {};
+function validateProfileForm(formData: ProfileFormData): FormErrors {
+  const errors: FormErrors = {};
 
-  if (!data.firstName.trim()) {
+  if (!formData.firstName.trim()) {
     errors.firstName = "First name is required";
   }
-  if (!data.lastName.trim()) {
+
+  if (!formData.lastName.trim()) {
     errors.lastName = "Last name is required";
   }
-  if (!data.title.trim()) {
-    errors.title = "Professional title is required";
+
+  if (!formData.email.trim()) {
+    errors.email = "Email is required";
+  } else if (!EMAIL_REGEX.test(formData.email)) {
+    errors.email = "Please enter a valid email address";
   }
-  if (data.bio.length > MAX_BIO_LENGTH) {
+
+  if (!formData.username.trim()) {
+    errors.username = "Username is required";
+  } else if (formData.username.length < MIN_USERNAME_LENGTH) {
+    errors.username = `Username must be at least ${MIN_USERNAME_LENGTH} characters`;
+  }
+
+  if (formData.bio.length > MAX_BIO_LENGTH) {
     errors.bio = `Bio must be less than ${MAX_BIO_LENGTH} characters`;
-  }
-  if (data.skills.length === 0) {
-    errors.skills = "Add at least one skill";
-  }
-  if (data.hourlyRate <= 0) {
-    errors.hourlyRate = "Hourly rate must be greater than 0";
   }
 
   return errors;
 }
 
-interface AvatarDisplayProps {
-  profileImage: string | null;
-  firstName: string;
-  lastName: string;
-}
-
-function AvatarDisplay({ profileImage, firstName, lastName }: AvatarDisplayProps): React.JSX.Element {
-  if (profileImage) {
-    return (
-      <Image
-        src={profileImage}
-        alt="Profile"
-        fill
-        className="rounded-full object-cover"
-        sizes="(max-width: 768px) 96px, 128px"
-        priority
-      />
-    );
-  }
-  return (
-    <>
-      {firstName.charAt(0).toUpperCase()}
-      {lastName.charAt(0).toUpperCase()}
-    </>
-  );
-}
-
-export default function FreelancerProfilePage(): React.JSX.Element {
-  const user = useAuthStore((state) => state.user);
-  const { setMode } = useModeStore();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+export default function ProfilePage() {
+  const token = useAuthStore((state) => state.token);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-  const [errors, setErrors] = useState<FreelancerProfileErrors>({});
-  const [formData, setFormData] = useState<FreelancerProfileData>(MOCK_FREELANCER_PROFILE);
-  const [newSkill, setNewSkill] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [formData, setFormData] = useState<ProfileFormData>(INITIAL_FORM_DATA);
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  // Get all countries - simple list without flags
+  const countries = useMemo(() => Country.getAllCountries(), []);
+
+  // Wait for Zustand to hydrate from localStorage
   useEffect(() => {
-    setMode("freelancer");
-    if (user) {
-      const nameParts = user.username.split(" ");
-      setFormData((prev) => ({
-        ...prev,
-        firstName: nameParts[0] || user.username,
-        lastName: nameParts.slice(1).join(" ") || prev.lastName,
-      }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setIsHydrated(true);
   }, []);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void {
+  useEffect(() => {
+    async function loadProfile() {
+      // Wait for hydration before checking token
+      if (!isHydrated || !token) {
+        if (isHydrated) {
+          setIsFetching(false);
+        }
+        return;
+      }
+
+      try {
+        const profile = await getProfile(token);
+
+        setFormData({
+          firstName: profile.firstName || "",
+          lastName: profile.lastName || "",
+          email: profile.email || "",
+          username: profile.username || "",
+          bio: profile.bio || "",
+        });
+
+        // Set avatar URL, but filter out invalid blob URLs from database
+        setAvatarUrl(profile.avatarUrl?.startsWith('blob:') ? null : profile.avatarUrl);
+
+        // Set country from profile
+        if (profile.country) {
+          const country = Country.getAllCountries().find(
+            c => c.name.toLowerCase() === profile.country?.toLowerCase()
+          );
+          if (country) {
+            setSelectedCountry(country.isoCode);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load profile:", error);
+      } finally {
+        setIsFetching(false);
+      }
+    }
+
+    loadProfile();
+  }, [token, isHydrated]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: name === "hourlyRate" ? Number(value) : value }));
-    if (errors[name as keyof FreelancerProfileErrors]) {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name as keyof FormErrors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
   }
 
-  function handleAddSkill(skill: string): void {
-    if (skill.trim() && !formData.skills.includes(skill.trim())) {
-      setFormData((prev) => ({ ...prev, skills: [...prev.skills, skill.trim()] }));
-      setNewSkill("");
-      if (errors.skills) {
-        setErrors((prev) => ({ ...prev, skills: undefined }));
-      }
+  async function handleImageUpload(files: File[]) {
+    if (files.length === 0 || !token) return;
+
+    const file = files[0];
+
+    // Create a local preview URL for immediate feedback
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarUrl(previewUrl);
+    setIsUploadingImage(true);
+
+    try {
+      // Upload image to Cloudinary via backend
+      const result = await uploadImage(file, token, "avatars");
+
+      // Replace preview URL with the actual uploaded URL
+      URL.revokeObjectURL(previewUrl);
+      setAvatarUrl(result.url);
+
+      console.log("Image uploaded successfully:", result.url);
+
+      // Immediately save the avatar URL to the database
+      await updateProfile(token, {
+        avatarUrl: result.url,
+      });
+
+      console.log("Avatar URL saved to profile");
+    } catch (error) {
+      console.error("Failed to upload image:", error);
+
+      // Revert to previous avatar on error
+      URL.revokeObjectURL(previewUrl);
+      setAvatarUrl(null);
+
+      setErrors({ firstName: error instanceof Error ? error.message : "Failed to upload image" });
+    } finally {
+      setIsUploadingImage(false);
     }
   }
 
-  function handleRemoveSkill(skillToRemove: string): void {
-    setFormData((prev) => ({
-      ...prev,
-      skills: prev.skills.filter((s) => s !== skillToRemove),
-    }));
-  }
-
-  function handlePhotoClick(): void {
-    fileInputRef.current?.click();
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): void {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData((prev) => ({ ...prev, profileImage: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const validationErrors = validateForm(formData);
+
+    const validationErrors = validateProfileForm(formData);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
       return;
     }
 
+    if (!token) {
+      setErrors({ firstName: "Authentication token not found. Please log in again." });
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, MOCK_API_DELAY));
-    setIsLoading(false);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), SUCCESS_MESSAGE_DURATION);
+
+    try {
+      // Find country name from code
+      const countryName = countries.find(c => c.isoCode === selectedCountry)?.name || "";
+
+      // Don't send blob URLs to backend - they're not persistent
+      const avatarToSend = avatarUrl?.startsWith('blob:') ? undefined : avatarUrl || undefined;
+
+      await updateProfile(token, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        username: formData.username,
+        bio: formData.bio,
+        country: countryName,
+        avatarUrl: avatarToSend,
+      });
+
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), SUCCESS_MESSAGE_DURATION);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      setErrors({ firstName: error instanceof Error ? error.message : "Failed to update profile" });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  const availabilityOption = AVAILABILITY_OPTIONS.find((opt) => opt.value === formData.availability);
-
-  if (showPreview) {
+  if (isFetching) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-text-primary">Public Profile Preview</h1>
-          <button onClick={() => setShowPreview(false)} className={SECONDARY_BUTTON_STYLES}>
-            Back to Edit
-          </button>
-        </div>
-
-        <div className={NEUMORPHIC_CARD}>
-          <div className="flex items-start gap-6">
-            <div className={AVATAR_STYLES}>
-              <AvatarDisplay
-                profileImage={formData.profileImage}
-                firstName={formData.firstName}
-                lastName={formData.lastName}
-              />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-text-primary">
-                  {formData.firstName} {formData.lastName}
-                </h2>
-                <span className={cn("px-2 py-1 rounded-full text-xs text-white", availabilityOption?.color)}>
-                  {availabilityOption?.label}
-                </span>
-              </div>
-              <p className="text-text-secondary">{formData.title}</p>
-              <p className="text-sm text-text-secondary mt-1">{formData.location}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-primary">${formData.hourlyRate}</p>
-              <p className="text-sm text-text-secondary">per hour</p>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <h3 className="font-semibold text-text-primary mb-2">About</h3>
-            <p className="text-text-secondary">{formData.bio}</p>
-          </div>
-
-          <div className="mt-6">
-            <h3 className="font-semibold text-text-primary mb-2">Skills</h3>
-            <div className="flex flex-wrap gap-2">
-              {formData.skills.map((skill) => (
-                <span key={skill} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {formData.website && (
-            <div className="mt-6">
-              <h3 className="font-semibold text-text-primary mb-2">Website</h3>
-              <a href={formData.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                {formData.website}
-              </a>
-            </div>
-          )}
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <LoadingSpinner />
+          <p className="text-text-secondary">Loading profile...</p>
         </div>
       </div>
     );
@@ -305,51 +279,37 @@ export default function FreelancerProfilePage(): React.JSX.Element {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Freelancer Profile</h1>
-          <p className="text-text-secondary text-sm">Showcase your skills and attract clients</p>
+          <h1 className="text-2xl font-bold text-text-primary">Profile Settings</h1>
+          <p className="text-text-secondary text-sm">
+            Manage your account information
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          {showSuccess && (
-            <div className={cn("px-4 py-2 rounded-xl", "bg-success/10 border border-success/20", "animate-scale-in")}>
-              <div className="flex items-center gap-2">
-                <Icon path={ICON_PATHS.check} size="sm" className="text-success" />
-                <p className="text-sm text-success font-medium">Profile saved!</p>
-              </div>
+        {showSuccess && (
+          <div
+            className={cn(
+              "px-4 py-2 rounded-xl",
+              "bg-success/10 border border-success/20",
+              "animate-scale-in"
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Icon path={ICON_PATHS.check} size="sm" className="text-success flex-shrink-0" />
+              <p className="text-sm text-success font-medium">Profile updated!</p>
             </div>
-          )}
-          <button onClick={() => setShowPreview(true)} className={SECONDARY_BUTTON_STYLES}>
-            Preview Profile
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       <div className={NEUMORPHIC_CARD}>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="flex items-center gap-4">
-            <div className={AVATAR_STYLES}>
-              <AvatarDisplay
-                profileImage={formData.profileImage}
-                firstName={formData.firstName}
-                lastName={formData.lastName}
-              />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-text-primary text-sm">Profile Photo</h3>
-              <p className="text-xs text-text-secondary">JPG, PNG or GIF. Max 2MB.</p>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <button type="button" onClick={handlePhotoClick} className={SECONDARY_BUTTON_STYLES}>
-              Change Photo
-            </button>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <ImageUpload
+            variant="single"
+            label="Profile Photo"
+            currentImage={avatarUrl || undefined}
+            onUpload={handleImageUpload}
+          />
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <FormInput
               label="First Name"
               name="firstName"
@@ -367,137 +327,66 @@ export default function FreelancerProfilePage(): React.JSX.Element {
               onChange={handleChange}
             />
             <FormInput
-              label="Professional Title"
-              name="title"
-              value={formData.title}
-              placeholder="Full Stack Developer"
-              error={errors.title}
+              label="Username"
+              name="username"
+              value={formData.username}
+              placeholder="johndoe"
+              error={errors.username}
               onChange={handleChange}
             />
             <FormInput
-              label="Location"
-              name="location"
-              value={formData.location}
-              placeholder="San Francisco, CA"
-              onChange={handleChange}
-            />
-            <FormInput
-              label="Website"
-              name="website"
-              type="url"
-              value={formData.website}
-              placeholder="https://yourwebsite.com"
+              label="Email"
+              name="email"
+              type="email"
+              value={formData.email}
+              placeholder="john@example.com"
+              error={errors.email}
               onChange={handleChange}
             />
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">Hourly Rate ($)</label>
-              <input
-                type="number"
-                name="hourlyRate"
-                value={formData.hourlyRate}
-                onChange={handleChange}
-                min="1"
-                className={cn(NEUMORPHIC_INPUT, errors.hourlyRate && INPUT_ERROR_STYLES)}
-              />
-              {errors.hourlyRate && <p className="mt-1 text-xs text-error">{errors.hourlyRate}</p>}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Availability</label>
-            <div className="flex gap-3">
-              {AVAILABILITY_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, availability: option.value }))}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer",
-                    formData.availability === option.value ? NEUMORPHIC_INSET : SECONDARY_BUTTON_STYLES
-                  )}
-                >
-                  <span className={cn("w-2 h-2 rounded-full", option.color)} />
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Skills</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {formData.skills.map((skill) => (
-                <SkillTag key={skill} skill={skill} onRemove={() => handleRemoveSkill(skill)} />
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newSkill}
-                onChange={(e) => setNewSkill(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddSkill(newSkill))}
-                className={cn(NEUMORPHIC_INPUT, "flex-1")}
-                placeholder="Add a skill..."
-              />
-              <button
-                type="button"
-                onClick={() => handleAddSkill(newSkill)}
-                className={cn(PRIMARY_BUTTON, "px-4")}
+              <label className="block text-sm font-medium text-text-primary mb-2">Country</label>
+              <select
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                className={cn(NEUMORPHIC_INPUT, "pr-10")}
               >
-                Add
-              </button>
-            </div>
-            {errors.skills && <p className="mt-1 text-xs text-error">{errors.skills}</p>}
-            <div className="mt-2 flex flex-wrap gap-1">
-              {SUGGESTED_SKILLS.filter((s) => !formData.skills.includes(s))
-                .slice(0, 6)
-                .map((skill) => (
-                  <button
-                    key={skill}
-                    type="button"
-                    onClick={() => handleAddSkill(skill)}
-                    className="text-xs px-2 py-1 rounded-full bg-gray-100 text-text-secondary hover:bg-gray-200 cursor-pointer"
-                  >
-                    + {skill}
-                  </button>
+                <option value="">Select country...</option>
+                {countries.map((country) => (
+                  <option key={country.isoCode} value={country.isoCode}>
+                    {country.flag} {country.name}
+                  </option>
                 ))}
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-text-primary mb-1">Bio (Optional)</label>
+              <textarea
+                name="bio"
+                value={formData.bio}
+                onChange={handleChange}
+                rows={3}
+                className={cn(NEUMORPHIC_INPUT, "resize-none", errors.bio && INPUT_ERROR_STYLES)}
+                placeholder="Tell us about yourself..."
+              />
+              <div className="flex justify-between mt-1">
+                {errors.bio && <p className="text-xs text-error">{errors.bio}</p>}
+                <p className="text-xs text-text-secondary ml-auto">
+                  {formData.bio.length}/{MAX_BIO_LENGTH}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Bio</label>
-            <textarea
-              name="bio"
-              value={formData.bio}
-              onChange={handleChange}
-              rows={3}
-              className={cn(NEUMORPHIC_INPUT, "resize-none", errors.bio && INPUT_ERROR_STYLES)}
-              placeholder="Tell clients about your experience and expertise..."
-            />
-            <div className="flex justify-between mt-1">
-              {errors.bio && <p className="text-xs text-error">{errors.bio}</p>}
-              <p className="text-xs text-text-secondary ml-auto">
-                {formData.bio.length}/{MAX_BIO_LENGTH}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <Link
-              href="/app/freelancer/portfolio"
-              className="text-primary hover:text-primary-hover transition-colors flex items-center gap-1"
-            >
-              <Icon path={ICON_PATHS.briefcase} size="sm" />
-              Manage Portfolio
-            </Link>
-            <button type="submit" disabled={isLoading} className={cn(PRIMARY_BUTTON, "py-2 px-6")}>
+          <div className="flex justify-end">
+            <button type="submit" disabled={isLoading} className={cn(PRIMARY_BUTTON, "py-2 px-5")}>
               {isLoading ? (
                 <span className="flex items-center gap-2">
                   <LoadingSpinner />
                   Saving...
                 </span>
               ) : (
-                "Save Profile"
+                "Save Changes"
               )}
             </button>
           </div>

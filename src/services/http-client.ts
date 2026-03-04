@@ -8,8 +8,9 @@
 import type { ApiResponse, ResponseCode } from "@/types/api-response.types";
 import type { RequestOptions } from "@/types/http.types";
 import { HttpError } from "@/types/http.types";
+import { API_URL } from "@/config/api";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+const API_BASE_URL = API_URL;
 
 const DEFAULT_HEADERS: Record<string, string> = {
   "Content-Type": "application/json",
