@@ -78,9 +78,19 @@ export function ServiceCard({ service, className }: ServiceCardProps): React.JSX
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-text-primary text-lg truncate mb-1 group-hover:text-primary transition-colors">
-            {displayName}
-          </h3>
+          <div className="flex items-center gap-1.5 mb-1">
+            <h3 className="font-bold text-text-primary text-lg truncate group-hover:text-primary transition-colors">
+              {displayName}
+            </h3>
+            {service.totalOrders > 10 && (
+              <div className={cn(
+                "flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center",
+                "bg-success"
+              )}>
+                <Icon path={ICON_PATHS.check} size="sm" className="text-white" strokeWidth={3} />
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-2 mb-2">
             <Icon path={ICON_PATHS.mapPin} size="sm" className="text-text-secondary flex-shrink-0" />
             <span className="text-sm text-text-secondary truncate">{location}</span>
