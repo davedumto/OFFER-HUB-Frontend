@@ -1,17 +1,78 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/stores/auth-store";
+import { useModeStore } from "@/stores/mode-store";
 import { WalletAddress } from "@/components/ui/WalletAddress";
+import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
+import { getFreelancerActivities, type FreelancerActivity } from "@/lib/api/freelancer";
+import { getClientActivities, type ClientActivity } from "@/lib/api/client";
+
+type Activity = FreelancerActivity | ClientActivity;
 
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const { mode } = useModeStore();
   const [mounted, setMounted] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const lastFetchRef = useRef<number>(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const fetchActivities = useCallback(async (force = false) => {
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Debounce: skip if fetched less than 2 seconds ago (unless forced)
+    const now = Date.now();
+    if (!force && now - lastFetchRef.current < 2000) {
+      return;
+    }
+    lastFetchRef.current = now;
+
+    setIsLoading(true);
+    try {
+      // Fetch based on current mode
+      const data = mode === "client"
+        ? await getClientActivities(token)
+        : await getFreelancerActivities(token);
+      setActivities(data);
+    } catch (error) {
+      console.error("Failed to fetch activities:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token, mode]);
+
+  // Fetch data on mount and mode change
+  useEffect(() => {
+    if (!mounted) return;
+    fetchActivities(true);
+  }, [mounted, fetchActivities]);
+
+  // Refetch data when user navigates back to this page
+  useEffect(() => {
+    if (!mounted) return;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        fetchActivities();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [mounted, fetchActivities]);
 
   const formatBalance = (balance: string | undefined) => {
     if (!balance) return "$0.00";
@@ -19,16 +80,34 @@ export default function DashboardPage() {
     return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  // Sistema retorna 0 para usuarios nuevos (no hardcode)
-  const activeProjects = 0; // TODO: Obtener del backend cuando esté disponible
-  const pendingProposals = 0; // TODO: Obtener del backend cuando esté disponible
+  const getIconPath = (type: string): string => {
+    switch (type) {
+      case 'order_created':
+        return ICON_PATHS.briefcase;
+      case 'order_completed':
+        return ICON_PATHS.check;
+      case 'payment_received':
+        return ICON_PATHS.currency;
+      case 'withdrawal_completed':
+        return ICON_PATHS.arrowUp;
+      case 'topup_completed':
+        return ICON_PATHS.arrowDown;
+      default:
+        return ICON_PATHS.bell;
+    }
+  };
+
+  const activeProjects = 0;
+  const pendingProposals = 0;
 
   const stats = [
-    { label: "Active Projects", value: String(activeProjects), icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" },
-    { label: "Pending Proposals", value: String(pendingProposals), icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
-    { label: "Reserved Balance", value: mounted ? formatBalance(user?.balance?.reserved) : "...", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
-    { label: "Available Balance", value: mounted ? formatBalance(user?.balance?.available) : "...", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+    { label: "Active Projects", value: String(activeProjects), icon: ICON_PATHS.briefcase },
+    { label: "Pending Proposals", value: String(pendingProposals), icon: ICON_PATHS.document },
+    { label: "Reserved Balance", value: mounted ? formatBalance(user?.balance?.reserved) : "...", icon: ICON_PATHS.lock },
+    { label: "Available Balance", value: mounted ? formatBalance(user?.balance?.available) : "...", icon: ICON_PATHS.currency },
   ];
+
+  const activitiesLink = mode === "client" ? "/app/client/activities" : "/app/freelancer/activities";
 
   return (
     <div className="space-y-6">
@@ -40,9 +119,7 @@ export default function DashboardPage() {
           "shadow-[inset_2px_2px_4px_#d1d5db,inset_-2px_-2px_4px_#ffffff]"
         )}
       >
-        <svg className="w-5 h-5 text-text-secondary mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <Icon path={ICON_PATHS.search} size="md" className="text-text-secondary mr-3" />
         <input
           type="text"
           placeholder="Search projects, proposals, messages..."
@@ -97,9 +174,7 @@ export default function DashboardPage() {
                   "bg-primary/10"
                 )}
               >
-                <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d={stat.icon} />
-                </svg>
+                <Icon path={stat.icon} size="md" className="text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-text-primary">{stat.value}</p>
@@ -110,7 +185,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent Activity Placeholder */}
+      {/* Recent Activity */}
       <div
         className={cn(
           "p-6 rounded-2xl",
@@ -118,28 +193,53 @@ export default function DashboardPage() {
           "shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff]"
         )}
       >
-        <h2 className="text-lg font-bold text-text-primary mb-4">Recent Activity</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-text-primary">Recent Activity</h2>
+          <Link
+            href={activitiesLink}
+            className="group flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            View all
+            <Icon path={ICON_PATHS.chevronRight} size="sm" className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
+
         <div className="space-y-4">
-          {[
-            { action: "New proposal received", project: "E-commerce Website", time: "2 hours ago" },
-            { action: "Message from client", project: "Mobile App Design", time: "5 hours ago" },
-            { action: "Project milestone completed", project: "Dashboard UI", time: "1 day ago" },
-          ].map((activity, index) => (
-            <div
-              key={index}
-              className={cn(
-                "flex items-center justify-between p-4 rounded-xl",
-                "bg-background",
-                "shadow-[inset_2px_2px_4px_#d1d5db,inset_-2px_-2px_4px_#ffffff]"
-              )}
-            >
-              <div>
-                <p className="text-sm font-medium text-text-primary">{activity.action}</p>
-                <p className="text-xs text-text-secondary">{activity.project}</p>
-              </div>
-              <span className="text-xs text-text-secondary">{activity.time}</span>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner className="text-primary" />
             </div>
-          ))}
+          ) : activities.length > 0 ? (
+            activities.slice(0, 5).map((activity) => (
+              <div
+                key={activity.id}
+                className={cn(
+                  "flex items-center justify-between p-4 rounded-xl",
+                  "bg-background",
+                  "shadow-[inset_2px_2px_4px_#d1d5db,inset_-2px_-2px_4px_#ffffff]"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Icon path={getIconPath(activity.type)} size="sm" className="text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">{activity.title}</p>
+                    <p className="text-xs text-text-secondary">{activity.description}</p>
+                  </div>
+                </div>
+                <span className="text-xs text-text-secondary whitespace-nowrap">{activity.time}</span>
+              </div>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="w-12 h-12 bg-background rounded-full flex items-center justify-center mb-3 shadow-inner">
+                <Icon path={ICON_PATHS.clock} size="md" className="text-text-secondary/30" />
+              </div>
+              <p className="text-text-secondary text-sm">No recent activity</p>
+              <p className="text-text-secondary/70 text-xs mt-1">Your activity will appear here</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
