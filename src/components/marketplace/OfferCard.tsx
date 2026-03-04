@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
+import { BACKEND_URL } from "@/config/api";
 import type { MarketplaceOffer } from "@/lib/api/marketplace";
 
 interface OfferCardProps {
@@ -37,7 +38,7 @@ export function OfferCard({ offer, className }: OfferCardProps): React.JSX.Eleme
   const imageAttachment = offer.attachments?.find((att) =>
     att.mimeType.startsWith("image/")
   );
-  const imageUrl = imageAttachment ? `${backendUrl}${imageAttachment.url}` : null;
+  const imageUrl = imageAttachment ? `${BACKEND_URL}${imageAttachment.url}` : null;
 
   return (
     <Link
