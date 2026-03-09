@@ -1,20 +1,38 @@
 "use client";
 
+import { signIn } from "next-auth/react";
 import { cn } from "@/lib/cn";
 
-export function SocialAuthButtons() {
+interface SocialAuthButtonsProps {
+  mode?: "login" | "register" | "link";
+  disabled?: boolean;
+}
+
+export function SocialAuthButtons({ mode = "login", disabled = false }: SocialAuthButtonsProps) {
+  const handleOAuth = (provider: "google" | "github") => {
+    // Determine callback URL based on mode
+    const callbackUrl = mode === "link"
+      ? "/app/profile?linked=true"
+      : "/auth/callback";
+
+    signIn(provider, { callbackUrl });
+  };
+
   return (
     <div className="flex gap-3">
       {/* Google Button */}
       <button
         type="button"
+        onClick={() => handleOAuth("google")}
+        disabled={disabled}
         className={cn(
           "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl",
           "bg-white border border-border-light cursor-pointer",
           "shadow-[3px_3px_6px_#d1d5db,-3px_-3px_6px_#ffffff]",
           "hover:shadow-[5px_5px_10px_#d1d5db,-5px_-5px_10px_#ffffff] hover:scale-[1.02]",
           "active:shadow-[inset_3px_3px_6px_#d1d5db,inset_-3px_-3px_6px_#ffffff] active:scale-[0.98]",
-          "transition-all duration-200"
+          "transition-all duration-200",
+          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         )}
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -41,13 +59,16 @@ export function SocialAuthButtons() {
       {/* GitHub Button */}
       <button
         type="button"
+        onClick={() => handleOAuth("github")}
+        disabled={disabled}
         className={cn(
           "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl",
           "bg-secondary text-white cursor-pointer",
           "shadow-[3px_3px_6px_#d1d5db,-3px_-3px_6px_#ffffff]",
           "hover:shadow-[5px_5px_10px_#d1d5db,-5px_-5px_10px_#ffffff] hover:scale-[1.02] hover:bg-secondary/90",
           "active:shadow-[inset_3px_3px_6px_rgba(0,0,0,0.3)] active:scale-[0.98]",
-          "transition-all duration-200"
+          "transition-all duration-200",
+          "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         )}
       >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">

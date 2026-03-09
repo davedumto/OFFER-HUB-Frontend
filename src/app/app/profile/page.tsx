@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { Country, State } from "country-state-city";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/stores/auth-store";
@@ -14,6 +14,7 @@ import {
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { getProfile, updateProfile } from "@/lib/api/profile";
 import { uploadImage } from "@/lib/api/upload";
+import { ConnectedAccounts } from "@/components/profile/ConnectedAccounts";
 
 interface ProfileFormData {
   firstName: string;
@@ -492,6 +493,11 @@ export default function ProfilePage() {
           </div>
         </form>
       </div>
+
+      {/* Connected Accounts Section */}
+      <Suspense fallback={<div className="p-6 rounded-2xl bg-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] flex items-center justify-center"><LoadingSpinner className="text-primary" /></div>}>
+        <ConnectedAccounts />
+      </Suspense>
     </div>
   );
 }

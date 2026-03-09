@@ -87,7 +87,16 @@ function LoginContent() {
       const data = await response.json();
 
       if (!response.ok) {
-        setErrors({ email: data.error || "Login failed" });
+        // Handle OAuth-only account trying to login with password
+        if (data.error?.code === "LOGIN_VIA_OAUTH_REQUIRED") {
+          const providers = data.error.providers as string[] || [];
+          const providerNames = providers.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(" or ");
+          setErrors({
+            email: `This account uses ${providerNames} for login. Please use the ${providerNames} button above.`
+          });
+        } else {
+          setErrors({ email: data.error?.message || data.error || "Login failed" });
+        }
         setIsLoading(false);
         return;
       }

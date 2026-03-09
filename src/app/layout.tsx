@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "@/app/globals.css";
 import { NavigationProgressProvider } from "@/components/providers/NavigationProgressProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import { GlobalErrorHandler } from "@/components/error";
 import { CookieConsentBanner } from "@/components/cookie";
 import { SITE_CONFIG, DEFAULT_OG_IMAGE, getOrganizationSchema, getWebsiteSchema } from "@/lib/seo";
@@ -79,10 +80,12 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <GlobalErrorHandler />
-        <NavigationProgressProvider />
-        {children}
-        <CookieConsentBanner />
+        <AuthProvider>
+          <GlobalErrorHandler />
+          <NavigationProgressProvider />
+          {children}
+          <CookieConsentBanner />
+        </AuthProvider>
       </body>
     </html>
   );
