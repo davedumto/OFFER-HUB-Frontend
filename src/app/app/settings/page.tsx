@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { MOCK_API_DELAY } from "@/lib/constants";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
-import { NEUMORPHIC_CARD, PRIMARY_BUTTON } from "@/lib/styles";
+import { NEUMORPHIC_CARD, PRIMARY_BUTTON, DANGER_BUTTON } from "@/lib/styles";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 
 interface NotificationSettings {
@@ -282,6 +282,27 @@ export default function SettingsPage(): React.JSX.Element {
             className={cn(PRIMARY_BUTTON, "justify-center py-2 px-5")}
           >
             Open Preferences
+          </Link>
+        </div>
+      </div>
+
+      {/* Account */}
+      <div className={cn(NEUMORPHIC_CARD, "border border-error/20")}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-error mb-1 flex items-center gap-2">
+              <Icon path={ICON_PATHS.alertCircle} size="md" className="text-error" />
+              Account
+            </h2>
+            <p className="text-sm text-text-secondary">
+              Manage account details, linked services, and account deletion.
+            </p>
+          </div>
+          <Link
+            href="/app/settings/account"
+            className={cn(DANGER_BUTTON, "justify-center py-2 px-5")}
+          >
+            Manage Account
           </Link>
         </div>
       </div>
